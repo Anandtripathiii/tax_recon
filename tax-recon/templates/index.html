@@ -1,86 +1,159 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="light">
 <head>
 <meta charset="utf-8">
-<title>Ledger & Reconciliation</title>
+<title>Ledger &amp; Reconciliation — Team Fourier</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="/favicon.ico" type="image/svg+xml">
 <script src="/plotly.min.js" charset="utf-8"></script>
 <style>
-:root { --ink:#2B2118; --paper:#F5EFE0; --paper-2:#EDE4CF; --brown:#8B4513; --brown-soft:#A0522D;
-        --rule:rgba(139,69,19,0.3); --muted:#6B4423; }
+:root { --ink:#2B2118; --paper:#F5EFE0; --paper-2:#EDE4CF; --card:rgba(255,250,235,0.6);
+        --brown:#8B4513; --brown-soft:#A0522D; --rule:rgba(139,69,19,0.3); --muted:#6B4423;
+        --chart-tint:rgba(255,250,235,0.35); --chart-border:rgba(139,69,19,0.2); --accent:#8B4513; }
+[data-theme="dark"] { --ink:#F0E6D2; --paper:#2A1F15; --paper-2:#3A2A1D; --card:rgba(74,52,32,0.55);
+        --brown:#D4A373; --brown-soft:#C9A66B; --rule:rgba(212,163,115,0.3); --muted:#C9A66B;
+        --chart-tint:#F5EFE0; --chart-border:rgba(212,163,115,0.4); --accent:#D4A373; }
 * { box-sizing: border-box; }
-html, body { margin:0; padding:0; background:var(--paper);
+html, body { margin:0; padding:0; background:var(--paper); color: var(--ink);
   background-image:
     radial-gradient(ellipse at 15% 10%, rgba(139,69,19,0.05) 0%, transparent 55%),
     radial-gradient(ellipse at 85% 85%, rgba(139,69,19,0.06) 0%, transparent 55%),
     repeating-linear-gradient(0deg, rgba(107,68,35,0.012) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(90deg, rgba(107,68,35,0.012) 0 1px, transparent 1px 3px);
-  font-family: Georgia, 'Times New Roman', serif; color: var(--ink); font-size: 15px; line-height: 1.5;
+  font-family: Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.5;
+  min-height: 100vh;
+}
+[data-theme="dark"] body {
+  background-image:
+    radial-gradient(ellipse at 15% 10%, rgba(212,163,115,0.08) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(212,163,115,0.06) 0%, transparent 55%);
 }
 .wrap { display: flex; flex-direction: column; min-height: 100vh; }
 header.topbar { background: var(--paper-2); border-bottom: 1px solid var(--rule); padding: 1rem 1.6rem; }
-header.topbar .row { display: flex; flex-wrap: wrap; gap: 1rem 1.4rem; align-items: flex-end; justify-content: space-between; max-width: 1600px; margin: 0 auto; }
+header.topbar .row { display: flex; flex-wrap: wrap; gap: 1rem 1.4rem; align-items: flex-end;
+  justify-content: space-between; max-width: 1600px; margin: 0 auto; }
 header.topbar .brand { display: flex; flex-direction: column; min-width: 240px; }
-header.topbar .brand h1 { font-size: 1.6rem; margin: 0; border: none; padding: 0; }
+header.topbar .brand h1 { font-size: 1.6rem; margin: 0; color: var(--ink); border: none; padding: 0; }
 header.topbar .brand .caption { font-style: italic; color: var(--muted); font-size: .85rem; margin: 0; }
 header.topbar form.params { display: flex; gap: .8rem; align-items: flex-end; flex-wrap: wrap; }
-header.topbar form.params label { display: flex; flex-direction: column; color: var(--muted); font-size: .8rem; gap: .25rem; }
-header.topbar form.params input[type=number] { width: 110px; padding: .35rem .5rem; }
-header.topbar .reports { display: flex; gap: .5rem; align-items: flex-end; }
+header.topbar form.params label { display: flex; flex-direction: column; color: var(--muted);
+  font-size: .8rem; gap: .25rem; }
+header.topbar form.params input[type=number] { width: 100px; padding: .35rem .5rem;
+  background: var(--card); color: var(--ink); border: 1px solid var(--brown); border-radius: 2px;
+  font-family: inherit; }
+header.topbar .reports { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; }
+.theme-toggle { background: transparent; border: 1px solid var(--brown); color: var(--ink);
+  cursor: pointer; padding: .4rem .7rem; border-radius: 2px; font-family: inherit; font-size: .9rem; }
+.theme-toggle:hover { background: var(--brown); color: var(--paper); }
 main { padding: 1.4rem 2rem 3rem; max-width: 1600px; margin: 0 auto; width: 100%; }
-.sidebar-note { color: var(--muted); font-style: italic; font-size: .85rem; margin-top: .8rem; max-width: 1600px; margin-left: auto; margin-right: auto; padding: 0 1.6rem; }
-h1 { font-size: 2.3rem; margin:0 0 .3rem; color:#3D2817; border-bottom:2px double var(--brown); padding-bottom:.3rem; }
-h2 { font-size: 1.3rem; margin:1.6rem 0 .6rem; color:#3D2817; }
-.caption { font-style:italic; color: var(--muted); margin-bottom:1rem; }
-aside h3 { font-size:1.05rem; margin:0 0 .8rem; color:#3D2817; border-bottom:1px solid var(--rule); padding-bottom:.3rem; }
-label.field { display:block; margin: .9rem 0 .3rem; color: var(--muted); font-size:.9rem; }
-input[type=number], input[type=text], select { width:100%; padding:.45rem .55rem;
-  background:#FFFAEB; border:1px solid var(--brown); border-radius:2px;
-  font-family: inherit; color: var(--ink); font-size: .95rem; }
-input[type=range] { width:100%; accent-color: var(--brown); }
-.range-row { display:flex; justify-content: space-between; color: var(--muted); font-size:.85rem; }
-button, .btn { display:inline-block; padding:.55rem 1rem; background:#FFFAEB; color:#3D2817;
-  border:1px solid var(--brown); border-radius:2px; font-family: inherit; font-size:.95rem; cursor:pointer;
-  text-decoration:none; }
-button:hover, .btn:hover { background: var(--brown); color: #FFFAEB; }
-.btn-row { display:flex; gap:.6rem; margin-top:.6rem; flex-wrap:wrap; }
-.kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:.9rem; margin:.6rem 0 1.4rem; }
-.kpi { background: rgba(255,250,235,0.6); border:1px solid var(--rule); padding:.9rem 1rem;
+button, .btn { display: inline-block; padding: .45rem .9rem; background: var(--card); color: var(--ink);
+  border: 1px solid var(--brown); border-radius: 2px; font-family: inherit; font-size: .9rem;
+  cursor: pointer; text-decoration: none; }
+button:hover, .btn:hover { background: var(--brown); color: var(--paper); }
+.intro-banner { background: var(--card); border-left: 4px solid var(--accent); padding: .9rem 1.1rem;
+  margin-bottom: 1.2rem; font-size: .95rem; color: var(--ink); display: flex; align-items: flex-start;
+  gap: .8rem; flex-wrap: wrap; justify-content: space-between; }
+.intro-banner .text { flex: 1; min-width: 280px; }
+.intro-banner strong { color: var(--accent); }
+.intro-banner .meta { font-style: italic; color: var(--muted); font-size: .85rem; white-space: nowrap; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .9rem;
+  margin: .6rem 0 1.4rem; }
+.kpi { background: var(--card); border: 1px solid var(--rule); padding: .9rem 1rem;
   box-shadow: 1px 1px 3px rgba(107,68,35,0.08); }
-.kpi .label { font-size:.85rem; color: var(--muted); }
-.kpi .value { font-size:1.6rem; color: #3D2817; margin-top:.15rem; }
-.tabs { border-bottom: 1px solid var(--rule); margin: 1rem 0 1.2rem; display:flex; flex-wrap:wrap; }
-.tabs a { padding:.55rem 1.3rem; color: var(--muted); text-decoration:none;
-  border-bottom: 2px solid transparent; margin-right:.4rem; }
-.tabs a.active { color:#3D2817; border-bottom-color: var(--brown); background:rgba(255,250,235,.4); }
-.chart { background: rgba(255,250,235,0.35); border:1px solid rgba(139,69,19,0.2); padding:.5rem; margin-bottom:1rem; min-height:380px; }
-.grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
-@media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } .wrap { grid-template-columns: 1fr; } }
-table { width:100%; border-collapse: collapse; background: rgba(255,250,235,0.5);
-  border:1px solid var(--rule); font-size:.9rem; }
-th, td { padding:.45rem .6rem; border-bottom: 1px solid rgba(139,69,19,0.15); text-align:left; vertical-align:top; }
-th { background: rgba(139,69,19,0.08); color:#3D2817; font-weight: normal; font-variant: small-caps; letter-spacing:.5px; }
-tr:hover td { background: rgba(255,250,235,0.9); }
-.filter-row { display:flex; gap:.6rem; margin-bottom:.6rem; align-items:center; flex-wrap:wrap; }
-.filter-row input[type=text] { flex:1; max-width:400px; }
-.filter-row select { width:auto; min-width:200px; }
-.scroll { max-height: 540px; overflow:auto; border:1px solid var(--rule); }
-.scroll table { border:none; }
-.note { color: var(--muted); font-style:italic; font-size:.85rem; margin-top:.4rem; }
-footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--muted); font-size:.85rem; }
-.radio-tabs { display:none; }
+.kpi .label { font-size: .82rem; color: var(--muted); }
+.kpi .value { font-size: 1.5rem; color: var(--ink); margin-top: .15rem; }
+.tabs { border-bottom: 1px solid var(--rule); margin: 1rem 0 1.2rem; display: flex; flex-wrap: wrap; gap: 0; }
+.tabs a { padding: .55rem 1.1rem; color: var(--muted); text-decoration: none;
+  border-bottom: 2px solid transparent; margin-right: .3rem; }
+.tabs a.active { color: var(--ink); border-bottom-color: var(--accent); background: var(--card); }
+.chart { background: var(--chart-tint); border: 1px solid var(--chart-border); padding: .5rem;
+  margin-bottom: 1rem; min-height: 380px; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+@media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; }
+  header.topbar form.params input[type=number] { width: 80px; }
+  main { padding: 1rem; }
+  header.topbar .brand h1 { font-size: 1.3rem; } }
+table { width: 100%; border-collapse: collapse; background: var(--card);
+  border: 1px solid var(--rule); font-size: .9rem; }
+th, td { padding: .45rem .6rem; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
+th { background: rgba(139,69,19,0.08); color: var(--ink); font-weight: normal;
+  font-variant: small-caps; letter-spacing: .5px; }
+[data-theme="dark"] th { background: rgba(212,163,115,0.1); }
+tr:hover td { background: var(--card); }
+.filter-row { display: flex; gap: .6rem; margin-bottom: .6rem; align-items: center; flex-wrap: wrap; }
+.filter-row input[type=text], .filter-row select { padding: .4rem .55rem; background: var(--card);
+  color: var(--ink); border: 1px solid var(--brown); font-family: inherit; border-radius: 2px; }
+.filter-row input[type=text] { flex: 1; max-width: 400px; }
+.filter-row select { min-width: 180px; }
+.scroll { max-height: 560px; overflow: auto; border: 1px solid var(--rule); }
+.scroll table { border: none; }
+.note { color: var(--muted); font-style: italic; font-size: .85rem; margin-top: .4rem; }
+
+/* Example modal / card */
+.example-card { background: var(--card); border: 2px solid var(--accent); padding: 1.1rem 1.3rem;
+  margin: 0 0 1.2rem; position: relative; }
+.example-card h3 { margin: 0 0 .4rem; color: var(--accent); font-size: 1.1rem; }
+.example-card .ex-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: .8rem; }
+@media (max-width: 900px) { .example-card .ex-grid { grid-template-columns: 1fr; } }
+.ex-src { border: 1px solid var(--rule); padding: .7rem .85rem; background: rgba(255,250,235,0.5); }
+[data-theme="dark"] .ex-src { background: rgba(74,52,32,0.4); }
+.ex-src .label { color: var(--muted); font-size: .78rem; letter-spacing: .5px;
+  text-transform: uppercase; margin-bottom: .3rem; }
+.ex-src .big { font-size: 1.05rem; font-weight: bold; color: var(--ink); margin-bottom: .3rem; }
+.ex-src .line { font-size: .88rem; color: var(--ink); margin: .15rem 0; }
+.ex-highlight { color: #B23A20; font-weight: bold; }
+[data-theme="dark"] .ex-highlight { color: #E8743B; }
+.ex-verdict { margin-top: .8rem; padding: .6rem .85rem; background: rgba(178,58,32,0.08);
+  border-left: 3px solid #B23A20; font-size: .92rem; }
+[data-theme="dark"] .ex-verdict { background: rgba(232,116,59,0.1); border-left-color: #E8743B; }
+
+/* Loading overlay */
+.overlay { position: fixed; inset: 0; background: rgba(245,239,224,0.85);
+  display: none; align-items: center; justify-content: center; z-index: 999; }
+[data-theme="dark"] .overlay { background: rgba(42,31,21,0.85); }
+.overlay.on { display: flex; }
+.overlay .box { background: var(--paper-2); border: 2px solid var(--accent); padding: 1.5rem 2rem;
+  text-align: center; }
+.overlay .box .spin { display: inline-block; width: 30px; height: 30px; border: 3px solid var(--rule);
+  border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite;
+  margin-bottom: .6rem; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* Footer */
+footer.site-foot { margin-top: 2.5rem; padding: 1.4rem 1.6rem 1.6rem; border-top: 1px solid var(--rule);
+  background: var(--paper-2); font-size: .88rem; color: var(--muted); }
+footer.site-foot .row { max-width: 1600px; margin: 0 auto; display: flex; flex-wrap: wrap;
+  justify-content: space-between; gap: 1rem; }
+footer.site-foot .col h4 { margin: 0 0 .4rem; color: var(--ink); font-size: .95rem; }
+footer.site-foot a { color: var(--accent); text-decoration: none; }
+footer.site-foot a:hover { text-decoration: underline; }
+
+/* About tab */
+.about-section { max-width: 900px; }
+.about-section h2 { color: var(--ink); margin-top: 1.6rem; font-size: 1.3rem;
+  border-bottom: 1px solid var(--rule); padding-bottom: .3rem; }
+.about-section p { line-height: 1.65; }
+.about-section ul { line-height: 1.7; }
+.team-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: .9rem;
+  margin-top: .8rem; }
+.team-card { background: var(--card); border: 1px solid var(--rule); padding: .9rem 1rem; }
+.team-card .name { font-weight: bold; color: var(--ink); }
+.team-card .role { font-size: .85rem; color: var(--accent); margin-top: .15rem; }
+.team-card .desc { font-size: .85rem; color: var(--muted); margin-top: .3rem; }
 </style>
 </head>
 <body>
+<div class="overlay" id="loader"><div class="box"><div class="spin"></div><div>Running reconciliation…</div></div></div>
+
 <div class="wrap">
 <header class="topbar">
   <div class="row">
     <div class="brand">
       <h1>Ledger &amp; Reconciliation</h1>
-      <p class="caption">Invoices, payments and books, cross-checked for errors and unusual entries.</p>
+      <p class="caption">Invoices, payments and books — cross-checked for errors and unusual entries.</p>
     </div>
-    <form method="get" action="/" class="params">
-      <input type="hidden" name="tab" value="{{ active }}">
+    <form method="get" action="/" class="params" id="paramForm">
+      <input type="hidden" name="tab" value="{{ active if active != 'about' else 'summary' }}">
       <label>Invoices<input type="number" name="n" min="500" max="5000" step="100" value="{{ n }}"></label>
       <label>Error rate (%)<input type="number" name="rate" min="2" max="25" step="1" value="{{ rate }}"></label>
       <label>Seed<input type="number" name="seed" value="{{ seed }}"></label>
@@ -89,18 +162,61 @@ footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--rule
     <div class="reports">
       <a class="btn" href="/download/excel?n={{ n }}&rate={{ rate }}&seed={{ seed }}">Excel report</a>
       <a class="btn" href="/download/flagged?n={{ n }}&rate={{ rate }}&seed={{ seed }}">Flagged CSV</a>
+      <button type="button" class="theme-toggle" id="themeBtn" title="Toggle theme">◐</button>
     </div>
   </div>
 </header>
-<p class="sidebar-note">We use made-up data so we know the right answers. Precision and recall are measured against that.</p>
+
 <main>
   <nav class="tabs">
-    {% for t, lbl in [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy')] %}
+    {% set tabs = [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy'),('about','About')] %}
+    {% for t, lbl in tabs %}
       <a href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab={{t}}{% if t=='flagged' and q %}&q={{q}}{% endif %}{% if t=='flagged' and kind!='All' %}&kind={{kind}}{% endif %}" class="{% if active==t %}active{% endif %}">{{ lbl }}</a>
     {% endfor %}
   </nav>
 
   {% if active == 'summary' %}
+    <div class="intro-banner">
+      <div class="text">
+        <strong>What you're looking at:</strong> we generated {{ n }} fake invoices with planted errors in about {{ rate }}% of them, plus matching bank payments and ledger entries. The tool below cross-checked all three sources and found the problems. Because we planted the errors, we can measure exactly how well it did (see the Accuracy tab).
+      </div>
+      <div class="meta">Last run: <strong>{{ elapsed }} s</strong></div>
+    </div>
+
+    {% if example %}
+    <div class="example-card">
+      <h3>⚑ Example of what the tool catches</h3>
+      <div class="note" style="margin-top:0;">One real invoice from this run, shown as the tool sees it across three sources.</div>
+      <div class="ex-grid">
+        <div class="ex-src">
+          <div class="label">Invoice</div>
+          <div class="big">{{ example.invoice_id }}</div>
+          <div class="line">{{ example.party }}</div>
+          <div class="line">{{ example.date }}</div>
+          <div class="line">Taxable: {{ example.taxable }}</div>
+          <div class="line">GST @ <span class="ex-highlight">{{ example.gst_rate }}%</span></div>
+          <div class="line">Tax: <span class="ex-highlight">{{ example.charged_tax }}</span></div>
+          <div class="line">Total: {{ example.total }}</div>
+        </div>
+        <div class="ex-src">
+          <div class="label">Bank payment</div>
+          <div class="big">{{ example.bank_amount }}</div>
+          <div class="line">{{ example.bank_date }}</div>
+          <div class="line" style="font-family: monospace; font-size: .78rem;">{{ example.narration }}</div>
+        </div>
+        <div class="ex-src">
+          <div class="label">Ledger entry</div>
+          <div class="big">{{ example.ledger_amount }}</div>
+          <div class="line">{{ example.ledger_date }}</div>
+          <div class="line">{{ example.ledger_party }}</div>
+        </div>
+      </div>
+      <div class="ex-verdict">
+        ⚑ <strong>Flagged — wrong GST:</strong> at {{ example.gst_rate }}% the tax should have been {{ example.expected_tax }}, but {{ example.charged_tax }} was charged. The business owes {{ example.diff }} extra tax on this invoice alone.
+      </div>
+    </div>
+    {% endif %}
+
     <div class="kpis">
       {% for label, value in kpis %}
         <div class="kpi"><div class="label">{{ label }}</div><div class="value">{{ value }}</div></div>
@@ -110,7 +226,7 @@ footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--rule
       <div class="chart" id="donut"></div>
       <div class="chart" id="bars"></div>
     </div>
-    <p>{{ fuzzy_count }} payments had no usable invoice number and were matched by name, amount and date.</p>
+    <p>{{ fuzzy_count }} payments had no usable invoice number and were linked by name, amount and date (fuzzy matching).</p>
     <script>Plotly.newPlot('donut', {{ donut.data|tojson }}, {{ donut.layout|tojson }}, {displayModeBar:false, responsive:true});
             Plotly.newPlot('bars', {{ bars.data|tojson }}, {{ bars.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
 
@@ -124,11 +240,15 @@ footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--rule
       <input type="text" name="q" placeholder="Search party, invoice or reason" value="{{q}}">
       <button type="submit">Filter</button>
     </form>
-    <p class="note">Showing {{ flagged|length - 1 }} records (first 500 of filtered results).</p>
-    <div class="scroll"><table>
-<thead><tr>{% for c in flagged[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
-<tbody>{% for row in flagged[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
-</table></div>
+    {% if total_filtered == 0 %}
+      <p class="note">No records match this filter. Try changing the problem type or clearing the search.</p>
+    {% else %}
+      <p class="note">Showing {{ (flagged|length) - 1 }} of {{ total_filtered }} records (first 500 shown).</p>
+      <div class="scroll"><table>
+        <thead><tr>{% for c in flagged[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+        <tbody>{% for row in flagged[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+      </table></div>
+    {% endif %}
 
   {% elif active == 'tax' %}
     <div class="kpis">
@@ -137,12 +257,12 @@ footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--rule
       {% endfor %}
     </div>
     <div class="chart" id="gst"></div>
-    <h2>Monthly figures</h2>
+    <h2 style="color:var(--ink);">Monthly figures</h2>
     <table>
-<thead><tr>{% for c in monthly[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
-<tbody>{% for row in monthly[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
-</table>
-    <p class="note">Net liability = output tax on sales minus input tax credit on purchases. A negative number means credit carried forward.</p>
+      <thead><tr>{% for c in monthly[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in monthly[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table>
+    <p class="note">Net liability = output tax on sales minus input tax credit on purchases. A negative value means credit carried forward.</p>
     <script>Plotly.newPlot('gst', {{ gst.data|tojson }}, {{ gst.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
 
   {% elif active == 'anomaly' %}
@@ -151,11 +271,11 @@ footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--rule
       <div class="chart" id="hist"></div>
       <div class="chart" id="scat"></div>
     </div>
-    <h2>Top 25 most unusual invoices</h2>
+    <h2 style="color:var(--ink);">Top 25 most unusual invoices</h2>
     <div class="scroll"><table>
-<thead><tr>{% for c in anomaly_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
-<tbody>{% for row in anomaly_tbl[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
-</table></div>
+      <thead><tr>{% for c in anomaly_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in anomaly_tbl[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table></div>
     <script>Plotly.newPlot('hist', {{ hist.data|tojson }}, {{ hist.layout|tojson }}, {displayModeBar:false, responsive:true});
             Plotly.newPlot('scat', {{ scat.data|tojson }}, {{ scat.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
 
@@ -163,20 +283,90 @@ footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--rule
     <p>We planted the errors ourselves, so we know the right answers. <strong>Precision</strong>: of the records we flagged, how many were really bad. <strong>Recall</strong>: of the planted errors, how many we found.</p>
     <div class="chart" id="acc"></div>
     <table>
-<thead><tr>{% for c in acc_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
-<tbody>{% for row in acc_tbl[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
-</table>
-    <h2>Exact match only vs. our full matching</h2>
+      <thead><tr>{% for c in acc_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in acc_tbl[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table>
+    <h2 style="color:var(--ink);">Exact match only vs. our full matching</h2>
     <table>
-<thead><tr>{% for c in cmp_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
-<tbody>{% for row in cmp_tbl[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
-</table>
+      <thead><tr>{% for c in cmp_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+      <tbody>{% for row in cmp_tbl[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    </table>
     <p class="note">Without fuzzy matching, payments without an invoice number look like missing payments. Precision drops sharply.</p>
     <script>Plotly.newPlot('acc', {{ accuracy.data|tojson }}, {{ accuracy.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
-  {% endif %}
 
-  <footer>Fourier &middot; Fintechstico Consilium'26 &middot; PS2 Intelligent Tax Reconciliation</footer>
+  {% elif active == 'about' %}
+    <div class="about-section">
+      <h2>The problem</h2>
+      <p>Every Indian business keeps three records for each sale — the invoice they billed, the bank payment they received, and the ledger entry in their books. When these three don't agree, GST gets filed wrongly and Input Tax Credit (ITC) can be rejected by the tax department. Accountants spend days reconciling records by hand across thousands of entries every month.</p>
+
+      <h2>Our approach</h2>
+      <p>We built an end-to-end reconciliation tool with three layers:</p>
+      <ul>
+        <li><strong>Matching:</strong> exact match on invoice IDs, plus fuzzy matching on party name, amount and date for the rest. Catches payments where the bank narration is messy.</li>
+        <li><strong>Rule checks:</strong> recompute GST on 5, 12, 18 and 28% slabs; find duplicates; flag missing records; detect date shifts.</li>
+        <li><strong>Machine learning:</strong> an Isolation Forest model scores every invoice on 6 features (amount, party-relative size, tax ratio, days-to-pay, weekday, round-number) and surfaces the most unusual ones for human review.</li>
+      </ul>
+
+      <h2>How we prove it works</h2>
+      <p>We generate our own synthetic data with deliberately planted errors, so we have ground truth. This lets us report real precision and recall per error type — numbers most commercial tools do not publish.</p>
+      <p>On the default run of 3,000 invoices, we hit 100% precision on Wrong GST, Duplicates, Date shift and Missing ledger entries, and 90%+ on all other rule-based checks.</p>
+
+      <h2>Tech stack</h2>
+      <p>Python 3, pandas, NumPy, scikit-learn (Isolation Forest), rapidfuzz, Flask, Plotly, openpyxl. Runs on a normal laptop, no GPU needed. Deployed on Render.</p>
+
+      <h2>Team Fourier</h2>
+      <div class="team-grid">
+        <div class="team-card"><div class="name">Anurag Singh</div><div class="role">Team Leader</div><div class="desc">Tech stack and building</div></div>
+        <div class="team-card"><div class="name">Anand Tripathi</div><div class="role">Developer</div><div class="desc">Tech stack and building</div></div>
+        <div class="team-card"><div class="name">Saavya Verma</div><div class="role">Research</div><div class="desc">Problem analysis and comparison</div></div>
+        <div class="team-card"><div class="name">Akshat Mishra</div><div class="role">Documentation</div><div class="desc">Presentation and docs</div></div>
+      </div>
+    </div>
+  {% endif %}
 </main>
+
+<footer class="site-foot">
+  <div class="row">
+    <div class="col">
+      <h4>Team Fourier</h4>
+      Anurag Singh · Anand Tripathi · Saavya Verma · Akshat Mishra
+    </div>
+    <div class="col">
+      <h4>Built for</h4>
+      Fintechstico · Consilium'26 · NSUT<br>
+      Problem Statement 2 — Intelligent Tax Reconciliation
+    </div>
+    <div class="col">
+      <h4>Code</h4>
+      <a href="https://github.com/Anandtripathiii/tax_recon" target="_blank" rel="noopener">github.com/Anandtripathiii/tax_recon</a>
+    </div>
+  </div>
+</footer>
 </div>
+
+<script>
+// Theme toggle
+(function(){
+  const btn = document.getElementById('themeBtn');
+  const saved = localStorage.getItem('theme') || 'light';
+  document.documentElement.setAttribute('data-theme', saved);
+  btn.textContent = saved === 'dark' ? '☀' : '☾';
+  btn.addEventListener('click', function() {
+    const now = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', now);
+    localStorage.setItem('theme', now);
+    btn.textContent = now === 'dark' ? '☀' : '☾';
+  });
+})();
+// Loading overlay when the main form or any link navigation starts
+(function(){
+  const loader = document.getElementById('loader');
+  const form = document.getElementById('paramForm');
+  if (form) form.addEventListener('submit', function() { loader.classList.add('on'); });
+  document.querySelectorAll('.tabs a, .filter-row button').forEach(function(a) {
+    a.addEventListener('click', function() { loader.classList.add('on'); });
+  });
+})();
+</script>
 </body>
 </html>

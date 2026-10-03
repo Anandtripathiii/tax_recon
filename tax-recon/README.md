@@ -1,18 +1,16 @@
-# Tax Reconciliation
+# Tax reconciliation (Fintechstico PS2)
 
 Matches invoices, bank payments and ledger entries, then finds wrong GST, duplicates, missing records and unusual invoices.
 
-Built for Fintechstico (Consilium'26, NSUT) — Problem Statement 2 by **Team Fourier**.
+## Run it (Windows)
+    py -m venv .venv
+    .venv\Scripts\activate
+    pip install -r requirements.txt
+    streamlit run app.py
 
-## Features
-- Synthetic data generator with planted errors (so accuracy is measurable)
-- Exact + fuzzy matching (rapidfuzz) across three sources
-- GST slab recomputation (5, 12, 18, 28%)
-- Duplicate and missing-record detection
-- Isolation Forest for unusual records that rules miss
-- Monthly net GST liability and ITC-at-risk
-- Precision and recall per error type against the planted ground truth
-- Papery Flask dashboard with Plotly charts
-- Excel and CSV report downloads
+Check accuracy without the dashboard: `python engine.py`. Save the sample CSVs: `python generator.py`.
 
-## Run locally
+## Files
+- generator.py : makes fake invoices, bank and ledger records and plants errors (keeps a hidden answer table)
+- engine.py    : matching, tax check, duplicates, missing records, Isolation Forest, GST liability, accuracy scoring
+- app.py       : the dashboard

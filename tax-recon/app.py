@@ -1,17 +1,19 @@
-"""Flask dashboard for the tax reconciliation engine.
+"""Flask dashboard for tax reconciliation.
 
-Runs with `python app.py` (or double-click run.bat on Windows).
-No virtual environment, no activation, no PowerShell policy."""
+Runs with `python app.py` locally or `gunicorn app:app` in production.
+"""
 import io
 import json
+import os
+import pathlib
 import threading
+import time
 import webbrowser
 
 import pandas as pd
+import plotly
 import plotly.express as px
 import plotly.graph_objects as go
-import plotly
-import pathlib
 from flask import Flask, Response, abort, render_template, request, send_file
 
 from engine import evaluate, run_all, to_excel
@@ -36,8 +38,19 @@ def fig(f):
     return json.loads(f.to_json())
 
 
-def _cache_key(n, rate, seed):
-    return (int(n), round(float(rate), 4), int(seed))
+def rs(x):
+    """Format a rupee amount in Indian style: Lakh / Crore."""
+    try:
+        x = float(x)
+    except (TypeError, ValueError):
+        return ""
+    if x < 0:
+        return "-" + rs(-x)
+    if x >= 1e7:
+        return f"₹{x / 1e7:.2f} Cr"
+    if x >= 1e5:
+        return f"₹{x / 1e5:.2f} L"
+    return f"₹{x:,.0f}"
 
 
 _cache = {}
@@ -45,48 +58,108 @@ _lock = threading.Lock()
 
 
 def compute(n, rate, seed):
-    key = _cache_key(n, rate, seed)
+    key = (int(n), round(float(rate), 4), int(seed))
     with _lock:
         if key in _cache:
             return _cache[key]
+    t0 = time.time()
     d = make_data(n, rate, seed)
     res = run_all(d["invoices"], d["bank"], d["ledger"])
     base = run_all(d["invoices"], d["bank"], d["ledger"], fuzzy=False)
     ev = evaluate(d["truth"], res)
     ev_base = evaluate(d["truth"], base)
+    elapsed = time.time() - t0
     with _lock:
         _cache.clear()
-        _cache[key] = (res, ev, ev_base)
+        _cache[key] = (res, ev, ev_base, elapsed, d["truth"])
     return _cache[key]
+
+
+def pick_example(res, truth):
+    """Pick one wrong_gst invoice with matching bank and ledger to show side-by-side."""
+    inv = res["inv"]
+    bank = res["bank"]
+    led = res["ledger"]
+    wrong = truth[truth.error_type == "wrong_gst"].key.tolist()
+    for rid in wrong:
+        row = inv[inv.row_id == rid]
+        if row.empty:
+            continue
+        r = row.iloc[0]
+        if pd.isna(r.txn_id) or pd.isna(r.entry_id):
+            continue
+        b = bank[bank.txn_id == r.txn_id].iloc[0]
+        l = led[led.entry_id == r.entry_id].iloc[0]
+        return {
+            "invoice_id": r.invoice_id, "party": r.party, "date": r.date.strftime("%d %b %Y"),
+            "taxable": rs(r.taxable_value), "gst_rate": int(r.gst_rate),
+            "charged_tax": rs(r.tax_amount), "expected_tax": rs(r.expected_tax),
+            "diff": rs(r.tax_amount - r.expected_tax), "total": rs(r.total),
+            "bank_date": pd.to_datetime(b.date).strftime("%d %b %Y"),
+            "bank_amount": rs(b.amount), "narration": b.narration,
+            "ledger_date": pd.to_datetime(l.date).strftime("%d %b %Y"),
+            "ledger_amount": rs(l.amount), "ledger_party": l.party,
+        }
+    return None
 
 
 app = Flask(__name__)
 PLOTLY_JS = str(next(pathlib.Path(plotly.__path__[0]).rglob("plotly.min.js")))
+
 
 @app.route("/plotly.min.js")
 def _plotly():
     return send_file(PLOTLY_JS, mimetype="application/javascript")
 
 
+@app.route("/favicon.ico")
+def _favicon():
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
+           '<rect width="64" height="64" fill="#F5EFE0"/>'
+           '<path d="M14 12 h32 l6 8 v32 a4 4 0 0 1 -4 4 h-30 a4 4 0 0 1 -4 -4 z" fill="#FFFAEB" stroke="#8B4513" stroke-width="2.5"/>'
+           '<path d="M46 12 v8 h6" fill="none" stroke="#8B4513" stroke-width="2.5" stroke-linejoin="round"/>'
+           '<line x1="20" y1="28" x2="44" y2="28" stroke="#8B4513" stroke-width="2"/>'
+           '<line x1="20" y1="36" x2="44" y2="36" stroke="#8B4513" stroke-width="2"/>'
+           '<line x1="20" y1="44" x2="36" y2="44" stroke="#8B4513" stroke-width="2"/>'
+           '</svg>')
+    return Response(svg, mimetype="image/svg+xml")
+
+
 @app.route("/")
 def index():
-    n = request.args.get("n", 3000, type=int)
-    rate = request.args.get("rate", 10, type=int) / 100
+    n = max(500, min(5000, request.args.get("n", 3000, type=int)))
+    rate = max(0.02, min(0.25, request.args.get("rate", 10, type=int) / 100))
     seed = request.args.get("seed", 42, type=int)
-    n = max(500, min(5000, n))
-    rate = max(0.02, min(0.25, rate))
-    res, ev, ev_base = compute(n, rate, seed)
+    active = request.args.get("tab", "summary")
+
+    if active == "about":
+        return render_template("index.html", active="about", n=n, rate=int(rate * 100), seed=seed,
+                               kpis=[], tax_kpis=[], flagged=[], monthly=[], anomaly_tbl=[],
+                               acc_tbl=[], cmp_tbl=[], kinds=["All"], kind="All", q="",
+                               donut=None, bars=None, gst=None, hist=None, scat=None, accuracy=None,
+                               fuzzy_count=0, elapsed=0, example=None)
+
+    res, ev, ev_base, elapsed, truth = compute(n, rate, seed)
     inv, flags, lia = res["inv"], res["flags"], res["liability"]
     status = inv.status.value_counts()
     orphans = len(res["orphans"])
+
     kpis = [("Invoices", f"{len(inv):,}"), ("Matched", f"{status.get('Matched', 0):,}"),
             ("Discrepancies", f"{status.get('Discrepancy', 0):,}"),
             ("Unmatched", f"{status.get('Unmatched', 0):,}"),
             ("Duplicates", f"{status.get('Duplicate', 0):,}"),
-            ("Payments with no invoice", f"{orphans:,}")]
-    donut = fig(px.pie(status.reset_index(), names="status", values="count", hole=.55,
-                       color_discrete_sequence=PAPER, title="Invoices by status"))
+            ("Orphan payments", f"{orphans:,}")]
+
+    # Pie chart with outside labels so slices don't overlap
+    donut_fig = px.pie(status.reset_index(), names="status", values="count", hole=.55,
+                      color_discrete_sequence=PAPER, title="Invoices by status")
+    donut_fig.update_traces(textposition="outside", textinfo="label+percent",
+                           pull=[0.02] * len(status))
+    donut = fig(donut_fig)
+
     by = flags.error_type.map(LABELS).value_counts().reset_index()
+    if by.empty:
+        by = pd.DataFrame({"error_type": ["(none)"], "count": [0]})
     bars = fig(px.bar(by, x="count", y="error_type", orientation="h",
                       color_discrete_sequence=PAPER, title="Problems found, by type",
                       labels={"count": "Records", "error_type": ""}
@@ -97,6 +170,8 @@ def index():
             df = df[cols]
         if rename:
             df = df.rename(columns=rename)
+        if df.empty:
+            return [list(df.columns)]
         return [list(df.columns)] + df.astype(object).where(df.notna(), "").values.tolist()
 
     kind = request.args.get("kind", "All")
@@ -110,9 +185,10 @@ def index():
         hay = t[["party", "invoice_id", "detail", "key"]].astype(str)
         mask = hay.apply(lambda c: c.str.contains(q, case=False, na=False)).any(axis=1)
         t = t[mask]
+    total_filtered = len(t)
     t = t.sort_values("problem").head(500).copy()
     t["date"] = pd.to_datetime(t["date"], errors="coerce").dt.strftime("%Y-%m-%d").fillna("")
-    t["total"] = t["total"].apply(lambda x: f"Rs {x:,.0f}" if pd.notna(x) else "")
+    t["total"] = t["total"].apply(rs)
     flagged = tbl(t, ["problem", "invoice_id", "key", "party", "date", "total", "detail"],
                   {"problem": "Problem", "invoice_id": "Invoice", "key": "Record", "party": "Party",
                    "date": "Date", "total": "Total", "detail": "Why it was flagged"})
@@ -127,17 +203,15 @@ def index():
                           yaxis_title="Rupees", legend=dict(orientation="h", y=-0.2))
     gst = fig(gst_fig)
     monthly = tbl(m.round(0).assign(
-        output_tax=m.output_tax.apply(lambda x: f"{x:,.0f}"),
-        itc=m.itc.apply(lambda x: f"{x:,.0f}"),
-        net_clean=m.net_clean.apply(lambda x: f"{x:,.0f}"),
-        net_as_filed=m.net_as_filed.apply(lambda x: f"{x:,.0f}")),
+        output_tax=m.output_tax.apply(rs), itc=m.itc.apply(rs),
+        net_clean=m.net_clean.apply(rs), net_as_filed=m.net_as_filed.apply(rs)),
         rename={"month": "Month", "output_tax": "Output tax", "itc": "ITC",
                 "net_clean": "Net (clean)", "net_as_filed": "Net (as filed)"})
     wrong = inv[(inv.issues.str.contains("wrong_gst")) & (inv.status != "Duplicate")]
-    tax_kpis = [("Net GST as filed", f"Rs {m.net_as_filed.sum():,.0f}"),
-                ("Net GST, clean only", f"Rs {m.net_clean.sum():,.0f}"),
-                ("ITC at risk", f"Rs {lia['itc_at_risk']:,.0f}"),
-                ("Tax gap on wrong-GST invoices", f"Rs {(wrong.tax_amount - wrong.expected_tax).sum():,.0f}")]
+    tax_kpis = [("Net GST as filed", rs(m.net_as_filed.sum())),
+                ("Net GST, clean only", rs(m.net_clean.sum())),
+                ("ITC at risk", rs(lia["itc_at_risk"])),
+                ("Tax gap on wrong-GST", rs((wrong.tax_amount - wrong.expected_tax).sum()))]
 
     hist = fig(px.histogram(inv, x="anomaly_score", nbins=40,
                             color_discrete_sequence=[PAPER[0]],
@@ -149,7 +223,7 @@ def index():
                           labels={"log_amount": "log amount", "party_z": "distance from party average"}))
     top = inv.sort_values("anomaly_score", ascending=False).head(25).copy()
     top["date"] = top["date"].dt.strftime("%Y-%m-%d")
-    top["total"] = top["total"].apply(lambda x: f"Rs {x:,.0f}")
+    top["total"] = top["total"].apply(rs)
     top["party_z"] = top["party_z"].round(2)
     top["anomaly_score"] = top["anomaly_score"].round(3)
     anomaly_tbl = tbl(top, ["invoice_id", "party", "date", "total", "party_z", "anomaly_score", "issues"],
@@ -180,12 +254,15 @@ def index():
                   rename={"error_type": "Error type"})
     kinds = ["All"] + sorted(set(flags.error_type.map(LABELS).dropna()))
     fuzzy_count = int((inv.match == "fuzzy").sum())
+    example = pick_example(res, truth)
+
     return render_template(
         "index.html", n=n, rate=int(rate * 100), seed=seed,
-        kpis=kpis, donut=donut, bars=bars, flagged=flagged, kinds=kinds, kind=kind, q=q,
+        kpis=kpis, donut=donut, bars=bars, flagged=flagged, total_filtered=total_filtered,
+        kinds=kinds, kind=kind, q=q,
         tax_kpis=tax_kpis, gst=gst, monthly=monthly, hist=hist, scat=scat, anomaly_tbl=anomaly_tbl,
         accuracy=accuracy, acc_tbl=acc_tbl, cmp_tbl=cmp_tbl, fuzzy_count=fuzzy_count,
-        active=request.args.get("tab", "summary"))
+        elapsed=round(elapsed, 2), example=example, active=active)
 
 
 @app.route("/download/<kind>")
@@ -193,10 +270,9 @@ def download(kind):
     n = request.args.get("n", 3000, type=int)
     rate = request.args.get("rate", 10, type=int) / 100
     seed = request.args.get("seed", 42, type=int)
-    res, _, _ = compute(n, rate, seed)
+    res, _, _, _, _ = compute(n, rate, seed)
     if kind == "excel":
-        data = to_excel(res)
-        return send_file(io.BytesIO(data), as_attachment=True,
+        return send_file(io.BytesIO(to_excel(res)), as_attachment=True,
                          download_name="reconciliation_report.xlsx",
                          mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     if kind == "flagged":
@@ -211,7 +287,6 @@ def _open_browser():
     threading.Timer(1.2, lambda: webbrowser.open_new("http://127.0.0.1:5000/")).start()
 
 
-import os
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     if port == 5000:
