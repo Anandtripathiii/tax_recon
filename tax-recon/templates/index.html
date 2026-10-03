@@ -89,8 +89,10 @@ tr:hover td { background: var(--card); }
 .filter-row { display: flex; gap: .6rem; margin-bottom: .6rem; align-items: center; flex-wrap: wrap; }
 .filter-row input[type=text], .filter-row select { padding: .4rem .55rem; background: var(--card);
   color: var(--ink); border: 1px solid var(--brown); font-family: inherit; border-radius: 2px; }
-.filter-row input[type=text] { flex: 1; max-width: 400px; }
+.filter-row input[type=text] { width: 320px; max-width: 100%; }
 .filter-row select { min-width: 180px; }
+.btn-primary { background: var(--brown); color: var(--paper); border: 1px solid var(--brown); padding: .45rem 1.1rem; border-radius: 2px; font-family: inherit; font-size: .95rem; cursor: pointer; }
+.btn-primary:hover { background: var(--brown-soft); }
 .scroll { max-height: 560px; overflow: auto; border: 1px solid var(--rule); }
 .scroll table { border: none; }
 .note { color: var(--muted); font-style: italic; font-size: .85rem; margin-top: .4rem; }
@@ -245,7 +247,8 @@ footer.site-foot a:hover { text-decoration: underline; }
         {% for k in kinds %}<option value="{{k}}" {% if k==kind %}selected{% endif %}>{{k}}</option>{% endfor %}
       </select>
       <input type="text" name="q" placeholder="Search party, invoice or reason" value="{{q}}">
-      <button type="submit">Filter</button>
+      <button type="submit" class="btn-primary">🔍 Search</button>
+      {% if q or kind != 'All' %}<a class="btn" href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab=flagged">Clear</a>{% endif %}
     </form>
     {% if total_filtered == 0 %}
       <p class="note">No records match this filter. Try changing the problem type or clearing the search.</p>
