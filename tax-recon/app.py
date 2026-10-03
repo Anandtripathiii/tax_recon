@@ -57,22 +57,39 @@ _cache = {}
 _lock = threading.Lock()
 
 
-def compute(n, rate, seed):
+def compute(n, rate, seed, with_baseline=False):
+    """Core compute. The baseline (exact-match-only) is only needed on the Accuracy
+    tab, so by default we skip it and save ~0.5 s per first visit. When the user
+    does open Accuracy, we fill it in using the already-cached data."""
     key = (int(n), round(float(rate), 4), int(seed))
     with _lock:
-        if key in _cache:
-            return _cache[key]
-    t0 = time.time()
-    d = make_data(n, rate, seed)
-    res = run_all(d["invoices"], d["bank"], d["ledger"])
-    base = run_all(d["invoices"], d["bank"], d["ledger"], fuzzy=False)
-    ev = evaluate(d["truth"], res)
-    ev_base = evaluate(d["truth"], base)
-    elapsed = time.time() - t0
-    with _lock:
-        _cache.clear()
-        _cache[key] = (res, ev, ev_base, elapsed, d["truth"])
-    return _cache[key]
+        entry = _cache.get(key)
+    if entry is None:
+        t0 = time.time()
+        d = make_data(n, rate, seed)
+        res = run_all(d["invoices"], d["bank"], d["ledger"])
+        ev = evaluate(d["truth"], res)
+        elapsed = time.time() - t0
+        entry = {"d": d, "res": res, "ev": ev, "ev_base": None, "elapsed": elapsed}
+        with _lock:
+            _cache.clear()
+            _cache[key] = entry
+    if with_baseline and entry["ev_base"] is None:
+        d = entry["d"]
+        base = run_all(d["invoices"], d["bank"], d["ledger"], fuzzy=False)
+        entry["ev_base"] = evaluate(d["truth"], base)
+    return (entry["res"], entry["ev"], entry["ev_base"], entry["elapsed"], entry["d"]["truth"])
+
+
+def _warmup():
+    """Precompute the default run at startup so the first visitor sees results instantly."""
+    try:
+        compute(3000, 0.10, 42, with_baseline=False)
+    except Exception:
+        pass
+
+
+threading.Thread(target=_warmup, daemon=True).start()
 
 
 def pick_example(res, truth):
@@ -139,7 +156,7 @@ def index():
                                donut=None, bars=None, gst=None, hist=None, scat=None, accuracy=None,
                                fuzzy_count=0, elapsed=0, example=None)
 
-    res, ev, ev_base, elapsed, truth = compute(n, rate, seed)
+    res, ev, ev_base, elapsed, truth = compute(n, rate, seed, with_baseline=(active == "accuracy"))
     inv, flags, lia = res["inv"], res["flags"], res["liability"]
     status = inv.status.value_counts()
     orphans = len(res["orphans"])
@@ -246,9 +263,14 @@ def index():
                   ["error_type", "planted", "flagged", "correct", "precision", "recall", "f1"],
                   {"error_type": "Error type", "planted": "Planted", "flagged": "Flagged",
                    "correct": "Correct", "precision": "Precision", "recall": "Recall", "f1": "F1"})
-    cmp = ev[["error_type", "precision", "recall"]].merge(
-        ev_base[["error_type", "precision", "recall"]], on="error_type",
-        suffixes=(" (full)", " (exact only)"))
+    if ev_base is not None:
+        cmp = ev[["error_type", "precision", "recall"]].merge(
+            ev_base[["error_type", "precision", "recall"]], on="error_type",
+            suffixes=(" (full)", " (exact only)"))
+    else:
+        cmp = ev[["error_type", "precision", "recall"]].rename(
+            columns={"precision": "precision (full)", "recall": "recall (full)"})
+        cmp["precision (exact only)"] = cmp["recall (exact only)"] = 0.0
     cmp["error_type"] = cmp.error_type.map(LABELS)
     cmp_tbl = tbl(cmp.assign(**{c: cmp[c].apply(pct) for c in cmp.columns if c != "error_type"}),
                   rename={"error_type": "Error type"})
@@ -270,7 +292,7 @@ def download(kind):
     n = request.args.get("n", 3000, type=int)
     rate = request.args.get("rate", 10, type=int) / 100
     seed = request.args.get("seed", 42, type=int)
-    res, _, _, _, _ = compute(n, rate, seed)
+    res, _, _, _, _ = compute(n, rate, seed, with_baseline=False)
     if kind == "excel":
         return send_file(io.BytesIO(to_excel(res)), as_attachment=True,
                          download_name="reconciliation_report.xlsx",
