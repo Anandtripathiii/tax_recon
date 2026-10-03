@@ -50,18 +50,21 @@ button, .btn { display: inline-block; padding: .45rem .9rem; background: var(--c
   border: 1px solid var(--brown); border-radius: 2px; font-family: inherit; font-size: .9rem;
   cursor: pointer; text-decoration: none; }
 button:hover, .btn:hover { background: var(--brown); color: var(--paper); }
-.intro-banner { background: var(--card); border-left: 4px solid var(--accent); padding: .9rem 1.1rem 1rem 1.3rem;
+.intro-banner { background: var(--card); border-left: 4px solid var(--accent); padding: .9rem 3rem 1rem 1.3rem;
   margin-bottom: 1.2rem; font-size: .95rem; color: var(--ink); display: flex; align-items: flex-start;
   gap: .8rem; flex-wrap: wrap; justify-content: space-between; position: relative; }
 .intro-banner .text { flex: 1; min-width: 280px; }
 .intro-banner strong { color: var(--accent); }
-.intro-banner .meta { font-style: italic; color: var(--muted); font-size: .85rem; white-space: nowrap; }
-.close-x { position: absolute; top: 6px; right: 10px; background: none; border: none; color: var(--muted);
-  cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 2px 6px; font-family: inherit; }
-.close-x:hover { color: var(--accent); background: none; }
+.intro-banner .meta { font-style: italic; color: var(--muted); font-size: .85rem; white-space: nowrap; padding-right: .4rem; }
+.close-x { position: absolute; top: 8px; right: 10px; width: 32px; height: 32px; display: flex;
+  align-items: center; justify-content: center; background: var(--card); border: 1px solid var(--rule);
+  border-radius: 50%; color: var(--muted); cursor: pointer; font-size: 1.4rem; line-height: 1;
+  padding: 0; font-family: inherit; transition: all 0.15s; }
+.close-x:hover { color: var(--paper); background: var(--brown); border-color: var(--brown); transform: scale(1.1); }
+.example-card { padding-right: 3rem; }
 .restore-strip { font-size: .82rem; color: var(--muted); margin-bottom: .8rem; }
 .restore-strip a { color: var(--accent); cursor: pointer; text-decoration: underline; margin-right: .9rem; }
-.example-card { position: relative; }
+.example-card { position: relative; padding-right: 3rem; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .9rem;
   margin: .6rem 0 1.4rem; }
 .kpi { background: var(--card); border: 1px solid var(--rule); padding: .9rem 1rem;
