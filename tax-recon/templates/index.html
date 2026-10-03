@@ -50,12 +50,18 @@ button, .btn { display: inline-block; padding: .45rem .9rem; background: var(--c
   border: 1px solid var(--brown); border-radius: 2px; font-family: inherit; font-size: .9rem;
   cursor: pointer; text-decoration: none; }
 button:hover, .btn:hover { background: var(--brown); color: var(--paper); }
-.intro-banner { background: var(--card); border-left: 4px solid var(--accent); padding: .9rem 1.1rem;
+.intro-banner { background: var(--card); border-left: 4px solid var(--accent); padding: .9rem 1.1rem 1rem 1.3rem;
   margin-bottom: 1.2rem; font-size: .95rem; color: var(--ink); display: flex; align-items: flex-start;
-  gap: .8rem; flex-wrap: wrap; justify-content: space-between; }
+  gap: .8rem; flex-wrap: wrap; justify-content: space-between; position: relative; }
 .intro-banner .text { flex: 1; min-width: 280px; }
 .intro-banner strong { color: var(--accent); }
 .intro-banner .meta { font-style: italic; color: var(--muted); font-size: .85rem; white-space: nowrap; }
+.close-x { position: absolute; top: 6px; right: 10px; background: none; border: none; color: var(--muted);
+  cursor: pointer; font-size: 1.1rem; line-height: 1; padding: 2px 6px; font-family: inherit; }
+.close-x:hover { color: var(--accent); background: none; }
+.restore-strip { font-size: .82rem; color: var(--muted); margin-bottom: .8rem; }
+.restore-strip a { color: var(--accent); cursor: pointer; text-decoration: underline; margin-right: .9rem; }
+.example-card { position: relative; }
 .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: .9rem;
   margin: .6rem 0 1.4rem; }
 .kpi { background: var(--card); border: 1px solid var(--rule); padding: .9rem 1rem;
@@ -176,7 +182,8 @@ footer.site-foot a:hover { text-decoration: underline; }
   </nav>
 
   {% if active == 'summary' %}
-    <div class="intro-banner">
+    <div class="restore-strip" id="restoreStrip" style="display:none;"><span>Hidden:</span> <a id="showBanner" onclick="showCard('banner','hideBanner','showBanner')" style="display:none;">Show intro</a> <a id="showExample" onclick="showCard('example','hideExample','showExample')" style="display:none;">Show example</a></div>
+    <div class="intro-banner" id="banner"><button type="button" class="close-x" title="Hide" onclick="hideCard('banner','hideBanner')">×</button>
       <div class="text">
         <strong>What you're looking at:</strong> we generated {{ n }} fake invoices with planted errors in about {{ rate }}% of them, plus matching bank payments and ledger entries. The tool below cross-checked all three sources and found the problems. Because we planted the errors, we can measure exactly how well it did (see the Accuracy tab).
       </div>
@@ -184,7 +191,7 @@ footer.site-foot a:hover { text-decoration: underline; }
     </div>
 
     {% if example %}
-    <div class="example-card">
+    <div class="example-card" id="example"><button type="button" class="close-x" title="Hide" onclick="hideCard('example','hideExample')">×</button>
       <h3>⚑ Example of what the tool catches</h3>
       <div class="note" style="margin-top:0;">One real invoice from this run, shown as the tool sees it across three sources.</div>
       <div class="ex-grid">
@@ -358,14 +365,41 @@ footer.site-foot a:hover { text-decoration: underline; }
     btn.textContent = now === 'dark' ? '☀' : '☾';
   });
 })();
-// Loading overlay when the main form or any link navigation starts
+// Loading overlay only on the main Run form (actual recomputation).
+// Tab switches and filter clicks are near-instant from cache, so no overlay there.
 (function(){
   const loader = document.getElementById('loader');
   const form = document.getElementById('paramForm');
-  if (form) form.addEventListener('submit', function() { loader.classList.add('on'); });
-  document.querySelectorAll('.tabs a, .filter-row button').forEach(function(a) {
-    a.addEventListener('click', function() { loader.classList.add('on'); });
+  if (form) form.addEventListener('submit', function() {
+    // Delay show by 150 ms so cache hits do not flash the overlay.
+    setTimeout(function(){ loader.classList.add('on'); }, 150);
   });
+})();
+// Hide/show the intro banner and example card. State is remembered per browser.
+function hideCard(id, key) {
+  const el = document.getElementById(id); if (el) el.style.display = 'none';
+  localStorage.setItem(key, '1');
+  updateRestoreStrip();
+}
+function showCard(id, key, linkId) {
+  const el = document.getElementById(id); if (el) el.style.display = '';
+  localStorage.removeItem(key);
+  const link = document.getElementById(linkId); if (link) link.style.display = 'none';
+  updateRestoreStrip();
+}
+function updateRestoreStrip() {
+  const strip = document.getElementById('restoreStrip');
+  if (!strip) return;
+  const b = localStorage.getItem('hideBanner') === '1';
+  const e = localStorage.getItem('hideExample') === '1';
+  document.getElementById('showBanner').style.display  = b ? 'inline' : 'none';
+  document.getElementById('showExample').style.display = e ? 'inline' : 'none';
+  strip.style.display = (b || e) ? 'block' : 'none';
+}
+(function(){
+  if (localStorage.getItem('hideBanner') === '1') { const b = document.getElementById('banner'); if (b) b.style.display='none'; }
+  if (localStorage.getItem('hideExample') === '1') { const e = document.getElementById('example'); if (e) e.style.display='none'; }
+  updateRestoreStrip();
 })();
 </script>
 </body>
