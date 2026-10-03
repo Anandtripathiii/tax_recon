@@ -1,0 +1,8 @@
+flask>=3.0
+pandas
+numpy
+scikit-learn
+rapidfuzz
+plotly
+openpyxl
+gunicorn

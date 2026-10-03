@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ledger & Reconciliation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="/plotly.min.js" charset="utf-8"></script>
+<style>
+:root { --ink:#2B2118; --paper:#F5EFE0; --paper-2:#EDE4CF; --brown:#8B4513; --brown-soft:#A0522D;
+        --rule:rgba(139,69,19,0.3); --muted:#6B4423; }
+* { box-sizing: border-box; }
+html, body { margin:0; padding:0; background:var(--paper);
+  background-image:
+    radial-gradient(ellipse at 15% 10%, rgba(139,69,19,0.05) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 85%, rgba(139,69,19,0.06) 0%, transparent 55%),
+    repeating-linear-gradient(0deg, rgba(107,68,35,0.012) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(90deg, rgba(107,68,35,0.012) 0 1px, transparent 1px 3px);
+  font-family: Georgia, 'Times New Roman', serif; color: var(--ink); font-size: 15px; line-height: 1.5;
+}
+.wrap { display: flex; flex-direction: column; min-height: 100vh; }
+header.topbar { background: var(--paper-2); border-bottom: 1px solid var(--rule); padding: 1rem 1.6rem; }
+header.topbar .row { display: flex; flex-wrap: wrap; gap: 1rem 1.4rem; align-items: flex-end; justify-content: space-between; max-width: 1600px; margin: 0 auto; }
+header.topbar .brand { display: flex; flex-direction: column; min-width: 240px; }
+header.topbar .brand h1 { font-size: 1.6rem; margin: 0; border: none; padding: 0; }
+header.topbar .brand .caption { font-style: italic; color: var(--muted); font-size: .85rem; margin: 0; }
+header.topbar form.params { display: flex; gap: .8rem; align-items: flex-end; flex-wrap: wrap; }
+header.topbar form.params label { display: flex; flex-direction: column; color: var(--muted); font-size: .8rem; gap: .25rem; }
+header.topbar form.params input[type=number] { width: 110px; padding: .35rem .5rem; }
+header.topbar .reports { display: flex; gap: .5rem; align-items: flex-end; }
+main { padding: 1.4rem 2rem 3rem; max-width: 1600px; margin: 0 auto; width: 100%; }
+.sidebar-note { color: var(--muted); font-style: italic; font-size: .85rem; margin-top: .8rem; max-width: 1600px; margin-left: auto; margin-right: auto; padding: 0 1.6rem; }
+h1 { font-size: 2.3rem; margin:0 0 .3rem; color:#3D2817; border-bottom:2px double var(--brown); padding-bottom:.3rem; }
+h2 { font-size: 1.3rem; margin:1.6rem 0 .6rem; color:#3D2817; }
+.caption { font-style:italic; color: var(--muted); margin-bottom:1rem; }
+aside h3 { font-size:1.05rem; margin:0 0 .8rem; color:#3D2817; border-bottom:1px solid var(--rule); padding-bottom:.3rem; }
+label.field { display:block; margin: .9rem 0 .3rem; color: var(--muted); font-size:.9rem; }
+input[type=number], input[type=text], select { width:100%; padding:.45rem .55rem;
+  background:#FFFAEB; border:1px solid var(--brown); border-radius:2px;
+  font-family: inherit; color: var(--ink); font-size: .95rem; }
+input[type=range] { width:100%; accent-color: var(--brown); }
+.range-row { display:flex; justify-content: space-between; color: var(--muted); font-size:.85rem; }
+button, .btn { display:inline-block; padding:.55rem 1rem; background:#FFFAEB; color:#3D2817;
+  border:1px solid var(--brown); border-radius:2px; font-family: inherit; font-size:.95rem; cursor:pointer;
+  text-decoration:none; }
+button:hover, .btn:hover { background: var(--brown); color: #FFFAEB; }
+.btn-row { display:flex; gap:.6rem; margin-top:.6rem; flex-wrap:wrap; }
+.kpis { display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:.9rem; margin:.6rem 0 1.4rem; }
+.kpi { background: rgba(255,250,235,0.6); border:1px solid var(--rule); padding:.9rem 1rem;
+  box-shadow: 1px 1px 3px rgba(107,68,35,0.08); }
+.kpi .label { font-size:.85rem; color: var(--muted); }
+.kpi .value { font-size:1.6rem; color: #3D2817; margin-top:.15rem; }
+.tabs { border-bottom: 1px solid var(--rule); margin: 1rem 0 1.2rem; display:flex; flex-wrap:wrap; }
+.tabs a { padding:.55rem 1.3rem; color: var(--muted); text-decoration:none;
+  border-bottom: 2px solid transparent; margin-right:.4rem; }
+.tabs a.active { color:#3D2817; border-bottom-color: var(--brown); background:rgba(255,250,235,.4); }
+.chart { background: rgba(255,250,235,0.35); border:1px solid rgba(139,69,19,0.2); padding:.5rem; margin-bottom:1rem; min-height:380px; }
+.grid-2 { display:grid; grid-template-columns: 1fr 1fr; gap:1rem; }
+@media (max-width: 1100px) { .grid-2 { grid-template-columns: 1fr; } .wrap { grid-template-columns: 1fr; } }
+table { width:100%; border-collapse: collapse; background: rgba(255,250,235,0.5);
+  border:1px solid var(--rule); font-size:.9rem; }
+th, td { padding:.45rem .6rem; border-bottom: 1px solid rgba(139,69,19,0.15); text-align:left; vertical-align:top; }
+th { background: rgba(139,69,19,0.08); color:#3D2817; font-weight: normal; font-variant: small-caps; letter-spacing:.5px; }
+tr:hover td { background: rgba(255,250,235,0.9); }
+.filter-row { display:flex; gap:.6rem; margin-bottom:.6rem; align-items:center; flex-wrap:wrap; }
+.filter-row input[type=text] { flex:1; max-width:400px; }
+.filter-row select { width:auto; min-width:200px; }
+.scroll { max-height: 540px; overflow:auto; border:1px solid var(--rule); }
+.scroll table { border:none; }
+.note { color: var(--muted); font-style:italic; font-size:.85rem; margin-top:.4rem; }
+footer { margin-top: 2.5rem; padding-top: 1rem; border-top: 1px solid var(--rule); color: var(--muted); font-size:.85rem; }
+.radio-tabs { display:none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="topbar">
+  <div class="row">
+    <div class="brand">
+      <h1>Ledger &amp; Reconciliation</h1>
+      <p class="caption">Invoices, payments and books, cross-checked for errors and unusual entries.</p>
+    </div>
+    <form method="get" action="/" class="params">
+      <input type="hidden" name="tab" value="{{ active }}">
+      <label>Invoices<input type="number" name="n" min="500" max="5000" step="100" value="{{ n }}"></label>
+      <label>Error rate (%)<input type="number" name="rate" min="2" max="25" step="1" value="{{ rate }}"></label>
+      <label>Seed<input type="number" name="seed" value="{{ seed }}"></label>
+      <button type="submit">Run reconciliation</button>
+    </form>
+    <div class="reports">
+      <a class="btn" href="/download/excel?n={{ n }}&rate={{ rate }}&seed={{ seed }}">Excel report</a>
+      <a class="btn" href="/download/flagged?n={{ n }}&rate={{ rate }}&seed={{ seed }}">Flagged CSV</a>
+    </div>
+  </div>
+</header>
+<p class="sidebar-note">We use made-up data so we know the right answers. Precision and recall are measured against that.</p>
+<main>
+  <nav class="tabs">
+    {% for t, lbl in [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy')] %}
+      <a href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab={{t}}{% if t=='flagged' and q %}&q={{q}}{% endif %}{% if t=='flagged' and kind!='All' %}&kind={{kind}}{% endif %}" class="{% if active==t %}active{% endif %}">{{ lbl }}</a>
+    {% endfor %}
+  </nav>
+
+  {% if active == 'summary' %}
+    <div class="kpis">
+      {% for label, value in kpis %}
+        <div class="kpi"><div class="label">{{ label }}</div><div class="value">{{ value }}</div></div>
+      {% endfor %}
+    </div>
+    <div class="grid-2">
+      <div class="chart" id="donut"></div>
+      <div class="chart" id="bars"></div>
+    </div>
+    <p>{{ fuzzy_count }} payments had no usable invoice number and were matched by name, amount and date.</p>
+    <script>Plotly.newPlot('donut', {{ donut.data|tojson }}, {{ donut.layout|tojson }}, {displayModeBar:false, responsive:true});
+            Plotly.newPlot('bars', {{ bars.data|tojson }}, {{ bars.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
+
+  {% elif active == 'flagged' %}
+    <form method="get" action="/" class="filter-row">
+      <input type="hidden" name="n" value="{{n}}"><input type="hidden" name="rate" value="{{rate}}">
+      <input type="hidden" name="seed" value="{{seed}}"><input type="hidden" name="tab" value="flagged">
+      <select name="kind">
+        {% for k in kinds %}<option value="{{k}}" {% if k==kind %}selected{% endif %}>{{k}}</option>{% endfor %}
+      </select>
+      <input type="text" name="q" placeholder="Search party, invoice or reason" value="{{q}}">
+      <button type="submit">Filter</button>
+    </form>
+    <p class="note">Showing {{ flagged|length - 1 }} records (first 500 of filtered results).</p>
+    <div class="scroll"><table>
+<thead><tr>{% for c in flagged[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+<tbody>{% for row in flagged[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+
+  {% elif active == 'tax' %}
+    <div class="kpis">
+      {% for label, value in tax_kpis %}
+        <div class="kpi"><div class="label">{{ label }}</div><div class="value">{{ value }}</div></div>
+      {% endfor %}
+    </div>
+    <div class="chart" id="gst"></div>
+    <h2>Monthly figures</h2>
+    <table>
+<thead><tr>{% for c in monthly[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+<tbody>{% for row in monthly[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table>
+    <p class="note">Net liability = output tax on sales minus input tax credit on purchases. A negative number means credit carried forward.</p>
+    <script>Plotly.newPlot('gst', {{ gst.data|tojson }}, {{ gst.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
+
+  {% elif active == 'anomaly' %}
+    <p>The model scores every invoice on amount, how far it sits from that party's usual amounts, tax ratio, days to pay, weekday and round numbers. The top 5% most unusual are flagged. Rules alone cannot catch these.</p>
+    <div class="grid-2">
+      <div class="chart" id="hist"></div>
+      <div class="chart" id="scat"></div>
+    </div>
+    <h2>Top 25 most unusual invoices</h2>
+    <div class="scroll"><table>
+<thead><tr>{% for c in anomaly_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+<tbody>{% for row in anomaly_tbl[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table></div>
+    <script>Plotly.newPlot('hist', {{ hist.data|tojson }}, {{ hist.layout|tojson }}, {displayModeBar:false, responsive:true});
+            Plotly.newPlot('scat', {{ scat.data|tojson }}, {{ scat.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
+
+  {% elif active == 'accuracy' %}
+    <p>We planted the errors ourselves, so we know the right answers. <strong>Precision</strong>: of the records we flagged, how many were really bad. <strong>Recall</strong>: of the planted errors, how many we found.</p>
+    <div class="chart" id="acc"></div>
+    <table>
+<thead><tr>{% for c in acc_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+<tbody>{% for row in acc_tbl[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table>
+    <h2>Exact match only vs. our full matching</h2>
+    <table>
+<thead><tr>{% for c in cmp_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
+<tbody>{% for row in cmp_tbl[1:] %}<tr>{% for c in row %}<td>{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+</table>
+    <p class="note">Without fuzzy matching, payments without an invoice number look like missing payments. Precision drops sharply.</p>
+    <script>Plotly.newPlot('acc', {{ accuracy.data|tojson }}, {{ accuracy.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
+  {% endif %}
+
+  <footer>Fourier &middot; Fintechstico Consilium'26 &middot; PS2 Intelligent Tax Reconciliation</footer>
+</main>
+</div>
+</body>
+</html>
