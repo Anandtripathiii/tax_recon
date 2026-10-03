@@ -5,6 +5,9 @@
 <title>Ledger &amp; Reconciliation — Team Fourier</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="/plotly.min.js" charset="utf-8"></script>
 <style>
 :root { --ink:#2B2118; --paper:#F5EFE0; --paper-2:#EDE4CF; --card:rgba(255,250,235,0.6);
@@ -20,7 +23,7 @@ html, body { margin:0; padding:0; background:var(--paper); color: var(--ink);
     radial-gradient(ellipse at 85% 85%, rgba(139,69,19,0.06) 0%, transparent 55%),
     repeating-linear-gradient(0deg, rgba(107,68,35,0.012) 0 1px, transparent 1px 3px),
     repeating-linear-gradient(90deg, rgba(107,68,35,0.012) 0 1px, transparent 1px 3px);
-  font-family: Georgia, 'Times New Roman', serif; font-size: 15px; line-height: 1.5;
+  font-family: 'Inter', -apple-system, 'Segoe UI', Roboto, system-ui, sans-serif; font-size: 15px; line-height: 1.55; font-feature-settings: 'cv11', 'ss01', 'ss03'; -webkit-font-smoothing: antialiased;
   min-height: 100vh;
 }
 [data-theme="dark"] body {
@@ -35,8 +38,8 @@ header.topbar { background: var(--paper-2); border-bottom: 1px solid var(--rule)
 header.topbar .row { display: flex; flex-wrap: wrap; gap: 1rem 1.4rem; align-items: flex-end;
   justify-content: space-between; max-width: 1600px; margin: 0 auto; }
 header.topbar .brand { display: flex; flex-direction: column; min-width: 240px; }
-header.topbar .brand h1 { font-size: 1.6rem; margin: 0; color: var(--ink); border: none; padding: 0; }
-header.topbar .brand .caption { font-style: italic; color: var(--muted); font-size: .85rem; margin: 0; }
+header.topbar .brand h1 { font-size: 1.6rem; margin: 0; color: var(--ink); border: none; padding: 0; font-weight: 700; letter-spacing: -0.02em; }
+header.topbar .brand .caption { color: var(--muted); font-size: .85rem; margin: .15rem 0 0; font-weight: 400; }
 header.topbar form.params { display: flex; gap: .8rem; align-items: flex-end; flex-wrap: wrap; }
 header.topbar form.params label { display: flex; flex-direction: column; color: var(--muted);
   font-size: .8rem; gap: .25rem; }
@@ -102,8 +105,8 @@ button:active, .btn:active { transform: translateY(0);
   margin: .6rem 0 1.4rem; }
 .kpi { background: var(--card); border: 1px solid var(--rule); padding: .9rem 1rem;
   box-shadow: 1px 1px 3px rgba(107,68,35,0.08); }
-.kpi .label { font-size: .82rem; color: var(--muted); }
-.kpi .value { font-size: 1.5rem; color: var(--ink); margin-top: .15rem; }
+.kpi .label { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 500; }
+.kpi .value { font-size: 1.6rem; color: var(--ink); margin-top: .15rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
 .tabs { border-bottom: 1px solid var(--rule); margin: 1rem 0 1.2rem; display: flex; flex-wrap: wrap; gap: 0; }
 .tabs a { padding: .55rem 1.1rem; color: var(--muted); text-decoration: none;
   border-bottom: 2px solid transparent; margin-right: .3rem; }
@@ -119,7 +122,7 @@ table { width: 100%; border-collapse: collapse; background: var(--card);
   border: 1px solid var(--rule); font-size: .9rem; }
 th, td { padding: .45rem .6rem; border-bottom: 1px solid var(--rule); text-align: left; vertical-align: top; }
 th { background: rgba(139,69,19,0.08); color: var(--ink); font-weight: normal;
-  font-variant: small-caps; letter-spacing: .5px; }
+  text-transform: uppercase; letter-spacing: .6px; font-size: .78rem; font-weight: 600; }
 [data-theme="dark"] th { background: rgba(212,163,115,0.1); }
 tr:hover td { background: var(--card); }
 .filter-row { display: flex; gap: .6rem; margin-bottom: .6rem; align-items: center; flex-wrap: wrap; }
@@ -140,9 +143,9 @@ tr:hover td { background: var(--card); }
 @media (max-width: 900px) { .example-card .ex-grid { grid-template-columns: 1fr; } }
 .ex-src { border: 1px solid var(--rule); padding: .7rem .85rem; background: rgba(255,250,235,0.5); }
 [data-theme="dark"] .ex-src { background: rgba(74,52,32,0.4); }
-.ex-src .label { color: var(--muted); font-size: .78rem; letter-spacing: .5px;
-  text-transform: uppercase; margin-bottom: .3rem; }
-.ex-src .big { font-size: 1.05rem; font-weight: bold; color: var(--ink); margin-bottom: .3rem; }
+.ex-src .label { color: var(--muted); font-size: .72rem; letter-spacing: .8px;
+  text-transform: uppercase; margin-bottom: .4rem; font-weight: 600; }
+.ex-src .big { font-size: 1.1rem; font-weight: 600; color: var(--ink); margin-bottom: .35rem; font-variant-numeric: tabular-nums; }
 .ex-src .line { font-size: .88rem; color: var(--ink); margin: .15rem 0; }
 .ex-highlight { color: #B23A20; font-weight: bold; }
 [data-theme="dark"] .ex-highlight { color: #E8743B; }
@@ -259,7 +262,7 @@ footer.site-foot a:hover { text-decoration: underline; }
           <div class="label">Bank payment</div>
           <div class="big">{{ example.bank_amount }}</div>
           <div class="line">{{ example.bank_date }}</div>
-          <div class="line" style="font-family: monospace; font-size: .78rem;">{{ example.narration }}</div>
+          <div class="line" style="font-family: 'JetBrains Mono', monospace; font-size: .78rem; color: var(--muted);">{{ example.narration }}</div>
         </div>
         <div class="ex-src">
           <div class="label">Ledger entry</div>
