@@ -42,14 +42,39 @@ header.topbar form.params input[type=number] { width: 100px; padding: .35rem .5r
   background: var(--card); color: var(--ink); border: 1px solid var(--brown); border-radius: 2px;
   font-family: inherit; }
 header.topbar .reports { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; }
-.theme-toggle { background: transparent; border: 1px solid var(--brown); color: var(--ink);
-  cursor: pointer; padding: .4rem .7rem; border-radius: 2px; font-family: inherit; font-size: .9rem; }
-.theme-toggle:hover { background: var(--brown); color: var(--paper); }
 main { padding: 1.4rem 2rem 3rem; max-width: 1600px; margin: 0 auto; width: 100%; }
-button, .btn { display: inline-block; padding: .45rem .9rem; background: var(--card); color: var(--ink);
-  border: 1px solid var(--brown); border-radius: 2px; font-family: inherit; font-size: .9rem;
-  cursor: pointer; text-decoration: none; }
-button:hover, .btn:hover { background: var(--brown); color: var(--paper); }
+button, .btn { display: inline-flex; align-items: center; gap: .4rem;
+  padding: .5rem 1rem; background: linear-gradient(180deg, rgba(255,250,235,0.95) 0%, rgba(237,228,207,0.9) 100%);
+  color: var(--ink); border: 1px solid var(--brown); border-radius: 4px;
+  font-family: inherit; font-size: .9rem; cursor: pointer; text-decoration: none;
+  box-shadow: 0 1px 2px rgba(107,68,35,0.08), inset 0 1px 0 rgba(255,255,255,0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease, color 0.2s ease; }
+button:hover, .btn:hover { background: linear-gradient(180deg, var(--brown-soft) 0%, var(--brown) 100%);
+  color: var(--paper); transform: translateY(-1px);
+  box-shadow: 0 3px 7px rgba(107,68,35,0.22), inset 0 1px 0 rgba(255,255,255,0.15); }
+button:active, .btn:active { transform: translateY(0);
+  box-shadow: inset 0 2px 4px rgba(107,68,35,0.2); }
+[data-theme="dark"] button, [data-theme="dark"] .btn {
+  background: linear-gradient(180deg, rgba(74,52,32,0.7) 0%, rgba(58,42,29,0.9) 100%);
+  color: var(--ink); border-color: var(--brown);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.08); }
+[data-theme="dark"] button:hover, [data-theme="dark"] .btn:hover {
+  background: linear-gradient(180deg, var(--brown) 0%, var(--brown-soft) 100%);
+  color: #2A1F15; }
+.btn-primary { background: linear-gradient(180deg, var(--brown-soft) 0%, var(--brown) 100%);
+  color: var(--paper); border: 1px solid var(--brown); font-weight: bold;
+  box-shadow: 0 2px 5px rgba(107,68,35,0.28), inset 0 1px 0 rgba(255,255,255,0.2); }
+.btn-primary:hover { background: linear-gradient(180deg, var(--brown) 0%, #6B3410 100%);
+  color: var(--paper); box-shadow: 0 4px 9px rgba(107,68,35,0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+  transform: translateY(-1px); }
+[data-theme="dark"] .btn-primary {
+  background: linear-gradient(180deg, var(--brown) 0%, var(--brown-soft) 100%);
+  color: #2A1F15; border-color: var(--brown);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
+[data-theme="dark"] .btn-primary:hover {
+  background: linear-gradient(180deg, var(--brown-soft) 0%, #E8C390 100%); color: #2A1F15; }
+.theme-toggle { width: 36px; height: 36px; padding: 0; justify-content: center;
+  border-radius: 50%; font-size: 1.1rem; }
 .intro-banner { background: var(--card); border-left: 4px solid var(--accent); padding: .9rem 3rem 1rem 1.3rem;
   margin-bottom: 1.2rem; font-size: .95rem; color: var(--ink); display: flex; align-items: flex-start;
   gap: .8rem; flex-wrap: wrap; justify-content: space-between; position: relative; }
@@ -94,8 +119,6 @@ tr:hover td { background: var(--card); }
   color: var(--ink); border: 1px solid var(--brown); font-family: inherit; border-radius: 2px; }
 .filter-row input[type=text] { width: 320px; max-width: 100%; }
 .filter-row select { min-width: 180px; }
-.btn-primary { background: var(--brown); color: var(--paper); border: 1px solid var(--brown); padding: .45rem 1.1rem; border-radius: 2px; font-family: inherit; font-size: .95rem; cursor: pointer; }
-.btn-primary:hover { background: var(--brown-soft); }
 .scroll { max-height: 560px; overflow: auto; border: 1px solid var(--rule); }
 .scroll table { border: none; }
 .note { color: var(--muted); font-style: italic; font-size: .85rem; margin-top: .4rem; }
@@ -181,11 +204,11 @@ footer.site-foot a:hover { text-decoration: underline; }
       <label>Invoices<input type="number" name="n" min="500" max="5000" step="100" value="{{ n }}"></label>
       <label>Error rate (%)<input type="number" name="rate" min="2" max="25" step="1" value="{{ rate }}"></label>
       <label>Seed<input type="number" name="seed" value="{{ seed }}"></label>
-      <button type="submit">Run reconciliation</button>
+      <button type="submit" class="btn-primary"><span style="font-size:.85em;">▶</span> Run reconciliation</button>
     </form>
     <div class="reports">
-      <a class="btn" href="/download/excel?n={{ n }}&rate={{ rate }}&seed={{ seed }}">Excel report</a>
-      <a class="btn" href="/download/flagged?n={{ n }}&rate={{ rate }}&seed={{ seed }}">Flagged CSV</a>
+      <a class="btn" title="Download Excel report" href="/download/excel?n={{ n }}&rate={{ rate }}&seed={{ seed }}"><span style="font-size:.9em;">⤓</span> Excel</a>
+      <a class="btn" title="Download flagged records as CSV" href="/download/flagged?n={{ n }}&rate={{ rate }}&seed={{ seed }}"><span style="font-size:.9em;">⤓</span> CSV</a>
       <button type="button" class="theme-toggle" id="themeBtn" title="Toggle theme">◐</button>
     </div>
   </div>
