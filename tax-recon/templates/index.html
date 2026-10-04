@@ -341,7 +341,6 @@ footer.site-foot a:hover { text-decoration: underline; }
             Plotly.newPlot('scat', {{ scat.data|tojson }}, {{ scat.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
 
   {% elif active == 'accuracy' %}
-    <p>We planted the errors ourselves, so we know the right answers. <strong>Precision</strong>: of the records we flagged, how many were really bad. <strong>Recall</strong>: of the planted errors, how many we found.</p>
     <div class="chart" id="acc"></div>
     <table>
       <thead><tr>{% for c in acc_tbl[0] %}<th>{{c}}</th>{% endfor %}</tr></thead>
