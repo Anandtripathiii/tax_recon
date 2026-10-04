@@ -228,7 +228,7 @@ footer.site-foot a:hover { text-decoration: underline; }
 
 <main>
   <nav class="tabs">
-    {% set tabs = [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy'),('about','About')] %}
+    {% set tabs = [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy')] %}
     {% for t, lbl in tabs %}
       <a href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab={{t}}{% if t=='flagged' and q %}&q={{q}}{% endif %}{% if t=='flagged' and kind!='All' %}&kind={{kind}}{% endif %}" class="{% if active==t %}active{% endif %}">{{ lbl }}</a>
     {% endfor %}
@@ -355,34 +355,6 @@ footer.site-foot a:hover { text-decoration: underline; }
     <p class="note">Without fuzzy matching, payments without an invoice number look like missing payments. Precision drops sharply.</p>
     <script>Plotly.newPlot('acc', {{ accuracy.data|tojson }}, {{ accuracy.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
 
-  {% elif active == 'about' %}
-    <div class="about-section">
-      <h2>The problem</h2>
-      <p>Every Indian business keeps three records for each sale — the invoice they billed, the bank payment they received, and the ledger entry in their books. When these three don't agree, GST gets filed wrongly and Input Tax Credit (ITC) can be rejected by the tax department. Accountants spend days reconciling records by hand across thousands of entries every month.</p>
-
-      <h2>Our approach</h2>
-      <p>We built an end-to-end reconciliation tool with three layers:</p>
-      <ul>
-        <li><strong>Matching:</strong> exact match on invoice IDs, plus fuzzy matching on party name, amount and date for the rest. Catches payments where the bank narration is messy.</li>
-        <li><strong>Rule checks:</strong> recompute GST on 5, 12, 18 and 28% slabs; find duplicates; flag missing records; detect date shifts.</li>
-        <li><strong>Machine learning:</strong> an Isolation Forest model scores every invoice on 6 features (amount, party-relative size, tax ratio, days-to-pay, weekday, round-number) and surfaces the most unusual ones for human review.</li>
-      </ul>
-
-      <h2>How we prove it works</h2>
-      <p>We generate our own synthetic data with deliberately planted errors, so we have ground truth. This lets us report real precision and recall per error type — numbers most commercial tools do not publish.</p>
-      <p>On the default run of 3,000 invoices, we hit 100% precision on Wrong GST, Duplicates, Date shift and Missing ledger entries, and 90%+ on all other rule-based checks.</p>
-
-      <h2>Tech stack</h2>
-      <p>Python 3, pandas, NumPy, scikit-learn (Isolation Forest), rapidfuzz, Flask, Plotly, openpyxl. Runs on a normal laptop, no GPU needed. Deployed on Render.</p>
-
-      <h2>Team Fourier</h2>
-      <div class="team-grid">
-        <div class="team-card"><div class="name">Anurag Singh</div><div class="role">Team Leader</div><div class="desc">Tech stack and building</div></div>
-        <div class="team-card"><div class="name">Anand Tripathi</div><div class="role">Developer</div><div class="desc">Tech stack and building</div></div>
-        <div class="team-card"><div class="name">Saavya Verma</div><div class="role">Research</div><div class="desc">Problem analysis and comparison</div></div>
-        <div class="team-card"><div class="name">Akshat Mishra</div><div class="role">Documentation</div><div class="desc">Presentation and docs</div></div>
-      </div>
-    </div>
   {% endif %}
 </main>
 

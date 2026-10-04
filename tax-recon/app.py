@@ -149,13 +149,6 @@ def index():
     seed = request.args.get("seed", 42, type=int)
     active = request.args.get("tab", "summary")
 
-    if active == "about":
-        return render_template("index.html", active="about", n=n, rate=int(rate * 100), seed=seed,
-                               kpis=[], tax_kpis=[], flagged=[], monthly=[], anomaly_tbl=[],
-                               acc_tbl=[], cmp_tbl=[], kinds=["All"], kind="All", q="",
-                               donut=None, bars=None, gst=None, hist=None, scat=None, accuracy=None,
-                               fuzzy_count=0, elapsed=0, example=None)
-
     res, ev, ev_base, elapsed, truth = compute(n, rate, seed, with_baseline=(active == "accuracy"))
     inv, flags, lia = res["inv"], res["flags"], res["liability"]
     status = inv.status.value_counts()
