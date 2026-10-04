@@ -320,7 +320,6 @@ footer.site-foot a:hover { text-decoration: underline; }
     <script>Plotly.newPlot('gst', {{ gst.data|tojson }}, {{ gst.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
 
   {% elif active == 'anomaly' %}
-    <p>The model scores every invoice on amount, how far it sits from that party's usual amounts, tax ratio, days to pay, weekday and round numbers. The top 5% most unusual are flagged. Rules alone cannot catch these.</p>
     <div class="grid-2">
       <div class="chart" id="hist"></div>
       <div class="chart" id="scat"></div>
