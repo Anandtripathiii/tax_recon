@@ -235,14 +235,7 @@ footer.site-foot a:hover { text-decoration: underline; }
   </nav>
 
   {% if active == 'summary' %}
-    <div class="restore-strip" id="restoreStrip" style="display:none;"><span>Hidden:</span> <a id="showBanner" onclick="showCard('banner','hideBanner','showBanner')" style="display:none;">Show intro</a> <a id="showExample" onclick="showCard('example','hideExample','showExample')" style="display:none;">Show example</a></div>
-    <div class="intro-banner" id="banner"><button type="button" class="close-x" title="Hide" onclick="hideCard('banner','hideBanner')">×</button>
-      <div class="text">
-        <strong>What you're looking at:</strong> we generated {{ n }} fake invoices with planted errors in about {{ rate }}% of them, plus matching bank payments and ledger entries. The tool below cross-checked all three sources and found the problems. Because we planted the errors, we can measure exactly how well it did (see the Accuracy tab).
-      </div>
-      <div class="meta">Last run: <strong>{{ elapsed }} s</strong></div>
-    </div>
-
+    <div class="restore-strip" id="restoreStrip" style="display:none;"><span>Hidden:</span> <a id="showExample" onclick="showCard('example','hideExample','showExample')" style="display:none;">Show example</a></div>
     {% if example %}
     <div class="example-card" id="example"><button type="button" class="close-x" title="Hide" onclick="hideCard('example','hideExample')">×</button>
       <h3>⚑ Example of what the tool catches</h3>
@@ -415,14 +408,12 @@ function showCard(id, key, linkId) {
 function updateRestoreStrip() {
   const strip = document.getElementById('restoreStrip');
   if (!strip) return;
-  const b = localStorage.getItem('hideBanner') === '1';
   const e = localStorage.getItem('hideExample') === '1';
-  document.getElementById('showBanner').style.display  = b ? 'inline' : 'none';
-  document.getElementById('showExample').style.display = e ? 'inline' : 'none';
-  strip.style.display = (b || e) ? 'block' : 'none';
+  const link = document.getElementById('showExample');
+  if (link) link.style.display = e ? 'inline' : 'none';
+  strip.style.display = e ? 'block' : 'none';
 }
 (function(){
-  if (localStorage.getItem('hideBanner') === '1') { const b = document.getElementById('banner'); if (b) b.style.display='none'; }
   if (localStorage.getItem('hideExample') === '1') { const e = document.getElementById('example'); if (e) e.style.display='none'; }
   updateRestoreStrip();
 })();
