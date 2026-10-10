@@ -66,7 +66,7 @@
 html { scroll-behavior: smooth; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
   font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
-  font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+  font-size: 1rem; line-height: 1.55; -webkit-font-smoothing: antialiased;
   background-image: var(--paper-grid); background-size: 60px 60px;
 }
 ::selection { background: var(--blue); color: #fff; }
@@ -104,16 +104,21 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
   stroke-width: 2.2; stroke-linecap: square; stroke-linejoin: miter; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
+html { font-size: clamp(14px, 0.35vw + 10.5px, 17px); }
+
 /* ============ HERO ============ */
-.hero { padding: 4rem 2rem 3rem; max-width: 1300px; margin: 0 auto; width: 100%; }
+.hero { height: 100vh; height: 100svh; min-height: 22rem; max-width: 1300px; margin: 0 auto; width: 100%;
+  display: flex; flex-direction: column; justify-content: center;
+  padding-block: clamp(1.25rem, 6svh, 4rem); padding-inline: clamp(1rem, 4vw, 2rem); }
+/* Sized by width and by height, so the whole heading fits on short laptop screens and narrow phones alike. */
 .hero-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-  font-size: clamp(2.25rem, 9vw, 7rem); line-height: 0.95; letter-spacing: -0.03em;
-  color: var(--ink); margin: 0 0 1.6rem; text-transform: uppercase; overflow-wrap: anywhere; }
+  font-size: clamp(2rem, min(9.6vw, 13svh), 7rem); line-height: 0.95; letter-spacing: -0.03em;
+  color: var(--ink); margin: 0 0 clamp(1rem, 3.5svh, 1.8rem); text-transform: uppercase; text-wrap: balance; }
 .hero-title .line { display: block; overflow: hidden; padding-bottom: .04em; }
 .hero-title .line > span { display: block; }
 .hero-title .accent { color: var(--blue); }
-.hero-desc { font-size: 1.15rem; color: var(--ink-soft); line-height: 1.55; max-width: 640px;
-  margin: 0 0 2.4rem; }
+.hero-desc { font-size: clamp(1rem, 0.6rem + 0.9svh, 1.2rem); color: var(--ink-soft); line-height: 1.55; max-width: 40rem;
+  margin: 0 0 clamp(1.2rem, 4svh, 2.4rem); }
 .hero-desc strong { color: var(--ink); font-weight: 700; }
 .hero-cta-row { display: flex; gap: 1rem; flex-wrap: wrap; }
 .btn-blue, .btn-dark { display: inline-flex; align-items: center; gap: .5rem;
@@ -127,7 +132,7 @@ input:focus-visible, select:focus-visible, textarea:focus-visible {
 .btn-blue:active, .btn-dark:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
 
 /* ============ SECTIONS ============ */
-.section { max-width: 1300px; width: 100%; margin: 0 auto; padding: 3rem 2rem; }
+.section { max-width: 1300px; width: 100%; margin: 0 auto; padding-block: clamp(2rem, 5vw, 3rem); padding-inline: clamp(1rem, 3vw, 2rem); }
 .section-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700;
   font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1; letter-spacing: -0.02em;
   text-transform: uppercase; margin: 0 0 2rem; color: var(--ink); }
@@ -198,7 +203,7 @@ button:hover, .btn:hover { background: var(--blue); color: #fff; }
 .theme-toggle .ico-sun, [data-theme="dark"] .theme-toggle .ico-moon { display: none; }
 [data-theme="dark"] .theme-toggle .ico-sun { display: block; }
 
-main { padding: 2rem; max-width: 1300px; margin: 0 auto; width: 100%; }
+main { padding: clamp(1rem, 2.5vw, 2rem); max-width: 1300px; margin: 0 auto; width: 100%; }
 
 /* Folder tabs on an ink rule; the strip scrolls sideways on narrow screens. */
 .tabs { margin: 0 0 2rem; display: flex; flex-wrap: nowrap; overflow-x: auto;
@@ -398,9 +403,6 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   .proof-grid, .ledger-cols { grid-template-columns: 1fr; }
   .ledger-col + .ledger-col { border-left: none; border-top: 2px solid var(--ink); }
   .example-card .ex-grid { grid-template-columns: 1fr; }
-  main { padding: 1rem; }
-  .hero { padding: 2.2rem 1rem; }
-  .section { padding: 2rem 1rem; }
   header.topbar { padding: 1rem; }
   footer.dark-footer { padding: 2.4rem 1rem 1.6rem; }
 }
@@ -454,7 +456,9 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     <a href="?tab=accuracy#dashboard" class="btn-dark">See Accuracy</a>
   </div>
 </section>
+</div>
 
+<div class="deck" id="deck">
 <section class="section">
   <h2 class="section-title">What we <span class="accent">do</span></h2>
   <div class="ledger-cols">
@@ -495,9 +499,6 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   </div>
 </section>
 
-</div>
-
-<div class="deck" id="deck">
 <header class="topbar" id="dashboard">
   <div class="row">
     <div class="brand">
@@ -938,13 +939,16 @@ document.addEventListener('submit', function (e) {
   if (!hasGsap || reduce) return;
   gsap.registerPlugin(ScrollTrigger);
 
-  /* Home stays pinned once its bottom reaches the bottom of the screen; the deck then slides up over it. */
+  /* Home is locked for the first 4 wheel ticks (HOLD px of scroll), then the deck slides up over it.
+     The deck is pushed down by HOLD so nothing moves during the lock; pinSpacing: false lets it scroll over home. */
+  var HOLD = 400;
   var home = document.getElementById('home'), deck = document.getElementById('deck');
   if (home && deck) {
+    deck.style.marginTop = HOLD + 'px';
+    align();
     ScrollTrigger.create({
-      trigger: home, endTrigger: deck,
-      start: function () { return home.offsetHeight > window.innerHeight ? 'bottom bottom' : 'top top'; },
-      end: 'top top', pin: true, pinSpacing: false, invalidateOnRefresh: true
+      trigger: home, endTrigger: deck, start: 'top top', end: 'top top',
+      pin: true, pinSpacing: false, invalidateOnRefresh: true
     });
   }
   fillRings(0);
