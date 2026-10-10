@@ -6,7 +6,7 @@
 <link rel="expect" href="#tab-panel-end" blocking="render">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>
-/* Set the saved theme and the motion flag before first paint: no theme flash, no content flash. */
+/* Set the saved theme before first paint, and work out whether this page arrives with the cover effect. */
 (function () {
   var root = document.documentElement;
   try { root.setAttribute('data-theme', localStorage.getItem('theme') || 'light'); } catch (e) {}
@@ -15,39 +15,29 @@
     root.classList.add('motion');
     setTimeout(function () { if (!window.gsap) root.classList.remove('motion'); }, 2500);
   }
-
-  /* Page transitions. Cross-document View Transitions where supported; GSAP fallback otherwise. */
+  /* Any move between pages of this site gets the same cover: the new tab content slides up over the old.
+     Cross-document View Transitions where supported; GSAP fallback otherwise. */
   var vt = !!(window.CSS && CSS.supports && CSS.supports('selector(:active-view-transition-type(x))'));
-  var act = window.navigation && navigation.activation;
-  /* Tab order decides direction: a tab to the right slides in from the right, one to the left from the left.
-     Same tab (Run, Search): history decides, with back sliding in from the left. */
-  var ORDER = ['summary', 'flagged', 'tax', 'anomaly', 'accuracy', 'verify', 'query'];
-  function tabOf(u) { try { return ORDER.indexOf(new URL(u, location.href).searchParams.get('tab') || 'summary'); } catch (e) { return -1; } }
-  function isBack(a) { return !!(a && a.navigationType === 'traverse' && a.from && a.entry && a.entry.index < a.from.index); }
-  function dirFor(fromUrl, toUrl, back) {
-    var a = tabOf(fromUrl), b = tabOf(toUrl);
-    if (a > -1 && b > -1 && a !== b) return b > a ? 'forward' : 'back';
-    return back ? 'back' : 'forward';
-  }
-  var dir = null, here = location.href;
+  var cover = false;
   if (!reduce) {
-    if (vt) {
-      if (act && act.from && act.from.url && act.navigationType !== 'reload') dir = dirFor(act.from.url, here, isBack(act));
-    } else {
-      var navEntry = performance.getEntriesByType && performance.getEntriesByType('navigation')[0], prev = null;
-      try { prev = sessionStorage.getItem('lastTab'); dir = sessionStorage.getItem('slide'); sessionStorage.removeItem('slide'); } catch (e) {}
-      if (!dir && navEntry && navEntry.type === 'back_forward') dir = prev ? dirFor('?tab=' + prev, here, true) : 'back';
+    var act = window.navigation && navigation.activation;
+    if (vt) cover = !!(act && act.from && act.navigationType !== 'reload');
+    else {
+      var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
+      var ref = ''; try { ref = document.referrer ? new URL(document.referrer).origin : ''; } catch (e) {}
+      cover = !!nav && (nav.type === 'back_forward' || (nav.type === 'navigate' && ref === location.origin));
     }
   }
-  try { sessionStorage.setItem('lastTab', new URL(here).searchParams.get('tab') || 'summary'); } catch (e) {}
-  window.__slide = { vt: vt, dir: dir, reduce: reduce, dirFor: dirFor, tabOf: tabOf };
-  /* An arriving page shows its tab content straight away; the slide is the motion. */
-  if (dir) root.classList.add('slide-nav');
-  if (vt) window.addEventListener('pagereveal', function (e) {
-    if (!e.viewTransition) return;
-    var a = window.navigation && navigation.activation;
-    e.viewTransition.types.add(a && a.from && a.from.url ? dirFor(a.from.url, location.href, isBack(a)) : 'forward');
-  });
+  window.__motion = { vt: vt, cover: cover, reduce: reduce };
+  /* Opaque sheets (the dashboard deck, the tab panel) repeat the page's graph paper; keep their grid in phase with it. */
+  window.__alignGrid = function () {
+    ['deck', 'tabPanel'].forEach(function (id) {
+      var el = document.getElementById(id); if (!el) return;
+      var r = el.getBoundingClientRect();
+      el.style.setProperty('--gx', -(r.left + window.scrollX) + 'px');
+      el.style.setProperty('--gy', -(r.top + window.scrollY) + 'px');
+    });
+  };
 })();
 </script>
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
@@ -65,6 +55,11 @@
   /* Surfaces that stay ink in both themes (verdict bar, footer). */
   --fixed-ink: #0a0a0f; --fixed-paper: #eef1f7; --fixed-link: #5b74ff;
   --wash: rgba(45,75,255,0.06);
+  --grid-line: rgba(45,75,255,0.05);
+  --paper-grid: linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+  /* A sheet laid over another: hard ink edge on top, soft depth behind it. */
+  --cover-shadow: 0 -6px 0 var(--ink), 0 -28px 56px rgba(10,10,15,0.22);
   --fail: #c8321f;   /* status only: a failed check, always with an icon and the word "Fail" */
 }
 [data-theme="dark"] {
@@ -74,6 +69,8 @@
   --rule: #2a2a38; --accent: #5b74ff;
   --chart-tint: #ffffff; --chart-border: #2a2a38;
   --wash: rgba(91,116,255,0.12);
+  --grid-line: rgba(91,116,255,0.07);
+  --cover-shadow: 0 -6px 0 var(--ink), 0 -28px 56px rgba(0,0,0,0.6);
   --fail: #ff6b57;
   color-scheme: dark;
 }
@@ -83,40 +80,29 @@ html { scroll-behavior: smooth; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
   font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
   font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
-  background-image:
-    linear-gradient(to right, rgba(45,75,255,0.05) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(45,75,255,0.05) 1px, transparent 1px);
-  background-size: 60px 60px;
-}
-[data-theme="dark"] body {
-  background-image:
-    linear-gradient(to right, rgba(91,116,255,0.07) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(91,116,255,0.07) 1px, transparent 1px);
+  background-image: var(--paper-grid); background-size: 60px 60px;
 }
 ::selection { background: var(--blue); color: #fff; }
 .wrap { display: flex; flex-direction: column; min-height: 100vh; overflow-x: clip; }
 
-/* Motion: content is hidden only while GSAP is about to reveal it. */
-html.motion [data-reveal], html.motion .hero-title .line > span,
-html.motion .hero-desc, html.motion .hero-cta-row { visibility: hidden; }
+/* Home and deck: the home section pins while the dashboard deck slides up over it (GSAP ScrollTrigger). */
+.home { position: relative; z-index: 0; }
+.deck { position: relative; z-index: 2; background-color: var(--bg); background-image: var(--paper-grid);
+  background-size: 60px 60px; background-position: var(--gx, 0) var(--gy, 0); box-shadow: var(--cover-shadow); }
 
-/* Page transitions: only the tab panel slides; header, controls and tabs stay put. */
-:root { --ease-slide: cubic-bezier(0.32, 0.72, 0, 1); --dur-slide: .35s; }
+/* Tab changes: the new tab content slides up over the old one. Same in every direction; tab bar stays put. */
+:root { --ease-cover: cubic-bezier(0.32, 0.72, 0, 1); --dur-cover: .35s; }
 @view-transition { navigation: auto; }
 @media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
-.tab-panel { view-transition-name: tab-panel; }
+.tab-panel { view-transition-name: tab-panel; min-height: 80vh; background-color: var(--bg);
+  background-image: var(--paper-grid); background-size: 60px 60px; background-position: var(--gx, 0) var(--gy, 0); }
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
-/* No position or size morph: the panel only ever moves sideways, even if the two pages sit at different scroll positions. */
 ::view-transition-group(tab-panel) { animation: none; }
-::view-transition-old(tab-panel) { animation: slide-out-left var(--dur-slide) var(--ease-slide) both; }
-::view-transition-new(tab-panel) { animation: slide-in-right var(--dur-slide) var(--ease-slide) both; }
-html:active-view-transition-type(back)::view-transition-old(tab-panel) { animation-name: slide-out-right; }
-html:active-view-transition-type(back)::view-transition-new(tab-panel) { animation-name: slide-in-left; }
-@keyframes slide-out-left { to { transform: translateX(-100vw); } }
-@keyframes slide-out-right { to { transform: translateX(100vw); } }
-@keyframes slide-in-right { from { transform: translateX(100vw); } }
-@keyframes slide-in-left { from { transform: translateX(-100vw); } }
-html.motion.slide-nav .tab-panel [data-reveal] { visibility: visible; }
+::view-transition-old(tab-panel) { animation: cover-hold var(--dur-cover) linear both; }
+::view-transition-new(tab-panel) { animation: cover-up var(--dur-cover) var(--ease-cover) both; box-shadow: var(--cover-shadow); }
+@keyframes cover-up { from { transform: translateY(75vh); } }
+@keyframes cover-hold { from, to { opacity: 1; } }
+.tab-panel.covering { box-shadow: var(--cover-shadow); position: relative; z-index: 1; }
 
 /* Focus: blue ring, offset off the ink edge. */
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
@@ -462,6 +448,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 
 <div class="wrap">
 
+<div class="home" id="home">
 <section class="hero">
   <h1 class="hero-title">
     <span class="line"><span>Smart</span></span>
@@ -478,8 +465,8 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 </section>
 
 <section class="section">
-  <h2 class="section-title" data-reveal>What we <span class="accent">do</span></h2>
-  <div class="ledger-cols" data-reveal>
+  <h2 class="section-title">What we <span class="accent">do</span></h2>
+  <div class="ledger-cols">
     <div class="ledger-col">
       <h3>Match</h3>
       <p>Link each invoice to its bank payment and ledger entry — exact match on IDs, fuzzy match on name, amount and date.</p>
@@ -496,9 +483,9 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 </section>
 
 <section class="section">
-  <h2 class="section-title" data-reveal>Live <span class="accent">proof</span></h2>
+  <h2 class="section-title">Live <span class="accent">proof</span></h2>
   <div class="proof-grid">
-    <div class="proof-card" data-reveal>
+    <div class="proof-card">
       <div class="proof-stat">{{ proof.invoices }}<span class="sub">Invoices</span></div>
       <div class="proof-body">
         <h3>Reconciled in {{ proof.seconds }} s</h3>
@@ -506,7 +493,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
         <a href="#dashboard" class="btn-blue">Try Demo <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a>
       </div>
     </div>
-    <div class="proof-card" data-reveal>
+    <div class="proof-card">
       <div class="proof-stat">{{ proof.gst_precision }}<span class="sub">Precision</span></div>
       <div class="proof-body">
         <h3>On wrong-GST detection</h3>
@@ -517,6 +504,9 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   </div>
 </section>
 
+</div>
+
+<div class="deck" id="deck">
 <header class="topbar" id="dashboard">
   <div class="row">
     <div class="brand">
@@ -554,7 +544,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   {% if active == 'summary' %}
     <div class="restore-strip" id="restoreStrip" hidden><span>Example hidden.</span> <button type="button" class="link-btn" id="showExample">Show example</button></div>
     {% if example %}
-    <div class="example-card" id="example" data-reveal>
+    <div class="example-card" id="example">
       <button type="button" class="close-x" id="hideExample" aria-label="Hide example"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>
       <h3><svg class="ico" aria-hidden="true"><use href="#i-flag"/></svg>Example of what the tool catches</h3>
       <div class="note" style="margin-top:0;">One real invoice from this run, shown as the tool sees it across three sources.</div>
@@ -592,12 +582,12 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 
     <div class="kpis">
       {% for label, value in kpis %}
-        <div class="kpi" data-reveal><div class="label">{{ label }}</div><div class="value">{{ value }}</div></div>
+        <div class="kpi"><div class="label">{{ label }}</div><div class="value">{{ value }}</div></div>
       {% endfor %}
     </div>
     <div class="grid-2">
-      <div class="chart" id="donut" data-reveal></div>
-      <div class="chart" id="bars" data-reveal></div>
+      <div class="chart" id="donut"></div>
+      <div class="chart" id="bars"></div>
     </div>
     <p class="note"><strong>{{ fuzzy_count }}</strong> payments had no usable invoice number and were linked by name, amount and date (fuzzy matching).</p>
     <script>Plotly.newPlot('donut', {{ donut.data|tojson }}, {{ donut.layout|tojson }}, {displayModeBar:false, responsive:true});
@@ -621,7 +611,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     {% else %}
       {% set shown = (flagged|length) - 1 %}
       <p class="note">{% if shown < total_filtered %}Showing the {{ shown }} biggest of {{ total_filtered }} flagged records.{% else %}{{ total_filtered }} flagged records.{% endif %} Largest ₹ at stake first; <strong>Found</strong> is the value that disagrees.</p>
-      <div class="scroll" data-reveal><table>
+      <div class="scroll"><table>
         <thead><tr>{% for c in flagged[0] %}<th class="{% if loop.index0 == 3 %}nowrap{% elif loop.index0 == 6 %}num{% endif %}">{{c}}</th>{% endfor %}</tr></thead>
         <tbody>{% for row in flagged[1:] %}<tr>
           <td class="nowrap">{{ row[0] }}</td><td class="nowrap">{{ row[1] }}</td><td>{{ row[2] }}</td>
@@ -634,7 +624,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   {% elif active == 'tax' %}
     <div class="kpis">
       {% for label, value in tax_kpis %}
-        <div class="kpi" data-reveal><div class="label">{{ label }}</div><div class="value">{{ value }}</div></div>
+        <div class="kpi"><div class="label">{{ label }}</div><div class="value">{{ value }}</div></div>
       {% endfor %}
     </div>
     <ul class="defs">
@@ -642,9 +632,9 @@ footer :focus-visible { outline-color: var(--fixed-link); }
       <li><b>ITC at risk</b>: input tax credit on purchase invoices that are not fully matched, so the credit may not hold.</li>
       <li><b>Tax gap on wrong-GST</b>: tax charged minus the tax the GST rate actually gives, summed over flagged invoices.</li>
     </ul>
-    <div class="chart" id="gst" data-reveal style="margin-top:1.4rem;"></div>
-    <h2 class="sub-title" data-reveal>Monthly figures</h2>
-    <div class="table-wrap" data-reveal><table>
+    <div class="chart" id="gst" style="margin-top:1.4rem;"></div>
+    <h2 class="sub-title">Monthly figures</h2>
+    <div class="table-wrap"><table>
       <thead><tr>{% for c in monthly[0] %}<th class="{% if not loop.first %}num{% endif %}">{{c}}</th>{% endfor %}</tr></thead>
       <tbody>{% for row in monthly[1:] %}<tr>{% for c in row %}<td class="{% if loop.first %}nowrap{% else %}num{% endif %}">{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
     </table></div>
@@ -654,11 +644,11 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   {% elif active == 'anomaly' %}
     <p class="note" style="margin-top:0;">A review queue, not a verdict. The model marks invoices that look unlike the rest; on this run <strong>{{ proof.ml_precision }}</strong> of those were real planted errors. Check them by hand.</p>
     <div class="grid-2" style="margin-top:1rem;">
-      <div class="chart" id="hist" data-reveal></div>
-      <div class="chart" id="scat" data-reveal></div>
+      <div class="chart" id="hist"></div>
+      <div class="chart" id="scat"></div>
     </div>
-    <h2 class="sub-title" data-reveal>Top 25 most unusual invoices</h2>
-    <div class="scroll" data-reveal><table>
+    <h2 class="sub-title">Top 25 most unusual invoices</h2>
+    <div class="scroll"><table>
       <thead><tr>{% for c in anomaly_tbl[0] %}<th class="{% if loop.index0 == 2 %}nowrap{% elif loop.index0 in [3,5] %}num{% endif %}">{{c}}</th>{% endfor %}</tr></thead>
       <tbody>{% for row in anomaly_tbl[1:] %}<tr>{% for c in row %}<td class="{% if loop.index0 in [0,2] %}nowrap{% elif loop.index0 in [3,5] %}num{% endif %}">{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
     </table></div>
@@ -668,8 +658,8 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 
   {% elif active == 'accuracy' %}
     {% if cmp_rows %}
-    <h2 class="sub-title" style="margin-top:0;" data-reveal>Exact match only <span style="color:var(--blue)">→</span> our full matching</h2>
-    <div class="table-wrap" data-reveal><table class="cmp">
+    <h2 class="sub-title" style="margin-top:0;">Exact match only <span style="color:var(--blue)">→</span> our full matching</h2>
+    <div class="table-wrap"><table class="cmp">
       <thead><tr><th>Error type</th><th>Precision</th><th>Recall</th></tr></thead>
       <tbody>{% for r in cmp_rows %}<tr class="{% if r.changed %}changed{% endif %}">
         <td>{{ r.label }}</td>
@@ -679,9 +669,9 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     </table></div>
     <p class="note">Without fuzzy matching, payments without an invoice number look like missing payments. Highlighted rows changed by 5 points or more.</p>
     {% endif %}
-    <h2 class="sub-title" data-reveal>Every error type, against the answer key</h2>
-    <div class="chart" id="acc" data-reveal></div>
-    <div class="table-wrap" data-reveal><table>
+    <h2 class="sub-title">Every error type, against the answer key</h2>
+    <div class="chart" id="acc"></div>
+    <div class="table-wrap"><table>
       <thead><tr>{% for c in acc_tbl[0] %}<th class="{% if not loop.first %}num{% endif %}">{{c}}</th>{% endfor %}</tr></thead>
       <tbody>{% for row in acc_tbl[1:] %}<tr>{% for c in row %}<td class="{% if not loop.first %}num{% endif %}">{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
     </table></div>
@@ -709,7 +699,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     {% macro chip(passed, text='') -%}
       <span class="verdict-chip {{ 'pass' if passed else 'fail' }}"><svg class="ico" aria-hidden="true"><use href="#{{ 'i-check' if passed else 'i-close' }}"/></svg>{{ text or ('Pass' if passed else 'Fail') }}</span>
     {%- endmacro %}
-    <section class="verify-hero" data-reveal>
+    <section class="verify-hero">
       {{ ring(verify.score, verify.all_pass, true, 'Overall verification score') }}
       <div>
         <h2>{% if verify.all_pass %}Reconciliation verified{% else %}{{ verify.passed }} of {{ verify.count }} checks pass{% endif %}</h2>
@@ -720,7 +710,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     </section>
     <div class="verify-grid">
       {% for c in verify.checks %}
-      <article class="check" data-reveal>
+      <article class="check">
         {{ ring(c.score, c.passed, false, c.title) }}
         {{ chip(c.passed) }}
         <h3>{{ c.title }}</h3>
@@ -730,7 +720,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     </div>
 
   {% elif active == 'query' %}
-    <div class="ask-wrap" data-reveal>
+    <div class="ask-wrap">
       <h2>Have a question?</h2>
       <p>Ask anything about the project — how it works, the tech, or the numbers.</p>
       <form class="ask-form" id="askForm">
@@ -741,6 +731,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
       <p class="note">Your question opens as a new issue on the project's GitHub repo, where you can review it before posting.</p>
     </div>
   {% endif %}
+  <script>window.__alignGrid && window.__alignGrid();</script>
   <div id="tab-panel-end"></div>
   </div>
 </main>
@@ -759,6 +750,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     </nav>
   </div>
 </footer>
+</div>
 
 </div>
 
@@ -792,138 +784,69 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   });
 })();
 
-/* Motion: GSAP + ScrollTrigger. Numbers never animate; sheets settle onto the desk. */
+/* Motion: GSAP + ScrollTrigger. Content appears as-is; the only movement is the deck covering home and tabs covering tabs. */
 (function () {
   var root = document.documentElement;
   var hasGsap = !!(window.gsap && window.ScrollTrigger);
-  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (!hasGsap || reduce) { root.classList.remove('motion'); }
+  var info = window.__motion || {};
+  var reduce = info.reduce;
+  if (!hasGsap || reduce) root.classList.remove('motion');
 
   /* Loader */
   var loader = document.getElementById('loader'), form = document.getElementById('paramForm');
-  if (form) form.addEventListener('submit', function () {
-    setTimeout(function () {
-      loader.classList.add('on');
-      if (hasGsap && !reduce) gsap.fromTo(loader.querySelector('.box'), { y: 10, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .3, ease: 'power3.out' });
-    }, 150);
-  });
+  if (form) form.addEventListener('submit', function () { setTimeout(function () { loader.classList.add('on'); }, 150); });
 
   /* Example card hide / show */
   var card = document.getElementById('example'), strip = document.getElementById('restoreStrip');
   function store(v) { try { v ? localStorage.setItem('hideExample', '1') : localStorage.removeItem('hideExample'); } catch (e) {} }
   function hidden() { try { return localStorage.getItem('hideExample') === '1'; } catch (e) { return false; } }
   if (card && strip) {
-    if (hidden()) { card.hidden = true; strip.hidden = false; card.removeAttribute('data-reveal'); }
+    if (hidden()) { card.hidden = true; strip.hidden = false; }
     document.getElementById('hideExample').addEventListener('click', function () {
-      store(true);
-      var done = function () { card.hidden = true; strip.hidden = false; if (window.gsap) gsap.set(card, { clearProps: 'all' }); document.getElementById('showExample').focus(); };
-      if (hasGsap && !reduce) gsap.to(card, { height: 0, autoAlpha: 0, marginBottom: 0, paddingTop: 0, paddingBottom: 0, duration: .35, ease: 'power2.inOut', onComplete: done });
-      else done();
+      store(true); card.hidden = true; strip.hidden = false; document.getElementById('showExample').focus();
     });
     document.getElementById('showExample').addEventListener('click', function () {
-      store(false); strip.hidden = true; card.hidden = false;
-      if (hasGsap && !reduce) settle([card]);
-      document.getElementById('hideExample').focus();
+      store(false); strip.hidden = true; card.hidden = false; document.getElementById('hideExample').focus();
     });
   }
+
+  var align = function () { if (window.__alignGrid) window.__alignGrid(); };
+  window.addEventListener('resize', align);
+  window.addEventListener('load', align);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(align);
 
   if (!hasGsap || reduce) return;
   gsap.registerPlugin(ScrollTrigger);
+  var DUR = .35;
+  var home = document.getElementById('home'), deck = document.getElementById('deck'), panel = document.getElementById('tabPanel');
 
-  var slide = window.__slide || {};
-  var panel = document.getElementById('tabPanel');
-  var DUR = .35, EASE = 'power3.inOut';
-
-  /* GSAP fallback for browsers without cross-document View Transitions. */
-  if (!slide.vt && panel) {
-    var W = function () { return window.innerWidth; };
-    var arrive = function (dir) {
-      gsap.fromTo(panel, { x: dir === 'back' ? -W() : W() }, { x: 0, duration: DUR, ease: EASE, clearProps: 'transform' });
-    };
-    if (slide.dir) arrive(slide.dir);
-    /* Restored from the back/forward cache: the panel was left off-screen; bring it back by tab order. */
-    window.addEventListener('pageshow', function (e) {
-      if (!e.persisted) return;
-      var prev = null; try { prev = sessionStorage.getItem('lastTab'); sessionStorage.setItem('lastTab', new URL(location.href).searchParams.get('tab') || 'summary'); } catch (er) {}
-      arrive(prev ? slide.dirFor('?tab=' + prev, location.href, true) : 'back');
-    });
-
-    var leaving = false;
-    var leave = function (dir, go) {
-      if (leaving) return; leaving = true;
-      try { sessionStorage.setItem('slide', dir); } catch (e) {}
-      gsap.to(panel, { x: dir === 'back' ? W() : -W(), duration: DUR, ease: EASE, onComplete: go });
-      setTimeout(go, DUR * 1000 + 150); /* never strand the click if a frame is dropped */
-    };
-    var samePage = function (u) { return u.pathname === location.pathname && u.search === location.search; };
-    document.addEventListener('click', function (e) {
-      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
-      var a = e.target.closest && e.target.closest('a[href]');
-      if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
-      var u = new URL(a.href, location.href);
-      if (u.origin !== location.origin || u.pathname.indexOf('/download/') === 0) return;
-      if (samePage(u) && u.hash) return; /* in-page anchor: let it scroll */
-      e.preventDefault();
-      var done = false;
-      leave(slide.dirFor(location.href, u.href, false), function () { if (!done) { done = true; location.href = u.href; } });
-    });
-    document.addEventListener('submit', function (e) {
-      var f = e.target;
-      if (e.defaultPrevented || !f || f.method.toLowerCase() !== 'get' || f.id === 'askForm') return;
-      e.preventDefault();
-      var done = false;
-      leave('forward', function () { if (!done) { done = true; HTMLFormElement.prototype.submit.call(f); } });
+  /* Home stays pinned once its bottom reaches the bottom of the screen; the deck then slides up over it.
+     pinSpacing: false keeps the deck where it is in the page, so it scrolls straight over the pinned home. */
+  if (home && deck) {
+    ScrollTrigger.create({
+      trigger: home, endTrigger: deck,
+      start: function () { return home.offsetHeight > window.innerHeight ? 'bottom bottom' : 'top top'; },
+      end: 'top top', pin: true, pinSpacing: false, invalidateOnRefresh: true
     });
   }
 
-  /* Verification rings fill from empty to their score when the tab opens. The score text never counts. */
-  var fills = document.querySelectorAll('.ring .fill');
-  if (fills.length) {
-    Array.prototype.forEach.call(fills, function (el, i) {
-      var c = parseFloat(el.dataset.circ), target = c * (1 - parseFloat(el.dataset.score) / 100);
-      gsap.fromTo(el, { strokeDashoffset: c }, { strokeDashoffset: target, duration: 1.1, ease: 'power3.out',
-        delay: (slide.dir ? DUR : 0) + .15 + i * .07 });
-    });
+  /* Fallback cover for browsers without cross-document View Transitions: the new tab content slides up into place. */
+  if (!info.vt && info.cover && panel) {
+    panel.classList.add('covering');
+    gsap.from(panel, { y: Math.round(window.innerHeight * 0.75), duration: DUR, ease: 'power3.out', clearProps: 'transform',
+      onComplete: function () { panel.classList.remove('covering'); } });
   }
 
-  /* On a slide arrival the panel's sheets are already in place; only the slide moves. */
-  if (slide.dir && panel) {
-    var inPanel = panel.querySelectorAll('[data-reveal]');
-    gsap.set(inPanel, { autoAlpha: 1 });
-    Array.prototype.forEach.call(inPanel, function (el) { el.removeAttribute('data-reveal'); });
-  }
-
-  /* A sheet starts lifted (up-left, longer shadow) and settles to its resting offset. */
-  function lifted(shadow) {
-    var m = shadow && shadow.match(/^(rgba?\([^)]*\))\s+(-?\d+)px\s+(-?\d+)px\s+0px/);
-    if (!m) return null;
-    return { rest: shadow, from: m[1] + ' ' + (+m[2] + 6) + 'px ' + (+m[3] + 6) + 'px 0px 0px' };
-  }
-  function settle(els, stagger) {
-    els.forEach(function (el, i) {
-      var s = lifted(getComputedStyle(el).boxShadow);
-      var from = { autoAlpha: 0, y: s ? -6 : 14, x: s ? -6 : 0 }, to = { autoAlpha: 1, y: 0, x: 0,
-        duration: .5, ease: 'power3.out', delay: i * (stagger || 0), clearProps: 'transform,boxShadow' };
-      if (s) { from.boxShadow = s.from; to.boxShadow = s.rest; }
-      gsap.fromTo(el, from, to);
-      if (el.id === 'example') {
-        var v = document.getElementById('verdict');
-        if (v) gsap.fromTo(v, { clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0% 0 0)', duration: .6, ease: 'power3.inOut', delay: .35 + i * (stagger || 0), clearProps: 'clipPath' });
-      }
-    });
-  }
-
-  /* The one authored moment: the hero title rises out of its ruled lines. */
-  var tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
-  tl.fromTo('.hero-title .line > span', { yPercent: 105, autoAlpha: 1 }, { yPercent: 0, autoAlpha: 1, duration: .8, stagger: .1, clearProps: 'transform' })
-    .fromTo('.hero-desc', { y: 12, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .5 }, '-=.45')
-    .fromTo('.hero-cta-row', { y: 12, autoAlpha: 0 }, { y: 0, autoAlpha: 1, duration: .5, clearProps: 'transform' }, '-=.35');
-
-  ScrollTrigger.batch('[data-reveal]', {
-    start: 'top 92%', once: true, interval: .08, batchMax: 6,
-    onEnter: function (batch) { settle(batch, .06); }
+  /* Verification rings fill from empty to their score. The score text is shown as-is from the start. */
+  Array.prototype.forEach.call(document.querySelectorAll('.ring .fill'), function (el, i) {
+    var c = parseFloat(el.dataset.circ), target = c * (1 - parseFloat(el.dataset.score) / 100);
+    gsap.fromTo(el, { strokeDashoffset: c }, { strokeDashoffset: target, duration: 1.1, ease: 'power3.out',
+      delay: (info.cover ? DUR : 0) + .1 + i * .07 });
   });
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { ScrollTrigger.refresh(); });
+
+  var refresh = function () { align(); ScrollTrigger.refresh(); };
+  window.addEventListener('load', refresh);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
 })();
 </script>
 </body>
