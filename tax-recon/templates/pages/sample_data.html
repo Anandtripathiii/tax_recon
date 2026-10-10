@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Sample data · Tax Reconciliation{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Sample <span class="accent">data</span></h1>
+  <p>Download the exact files behind a run: the invoices, the bank statement, the ledger, and the answer key of planted errors. Same settings, same files, every time.</p>
+</div>
+<form class="page-form" method="get" action="/sample-data">
+  <label class="fld"><span>Invoices</span><input type="number" name="n" min="500" max="5000" step="100" value="{{ n }}"></label>
+  <label class="fld"><span>Error rate (%)</span><input type="number" name="rate" min="2" max="25" value="{{ rate }}"></label>
+  <label class="fld"><span>Seed</span><input type="number" name="seed" min="0" value="{{ seed }}"></label>
+  <button type="submit" class="btn">Update links</button>
+</form>
+<div class="download-list">
+  {% for f in files %}
+  <a class="btn" href="/sample/{{ f.key }}.csv?n={{ n }}&amp;rate={{ rate }}&amp;seed={{ seed }}"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>{{ f.name }} ({{ '{:,}'.format(f.rows) }} rows)</a>
+  {% endfor %}
+</div>
+<h2 class="sub-title">What is in each file</h2>
+<div class="facts">
+  {% for f in files %}<div class="fact"><b>{{ f.name }}</b><p>{{ f.about }}</p><p><code>{{ f.cols }}</code></p></div>{% endfor %}
+</div>
+<p class="note">All names, GSTINs and amounts are generated. None of it is a real business.</p>
+{% endblock %}

@@ -32,421 +32,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="/plotly.min.js" charset="utf-8"></script>
-<style>
-:root {
-  --bg: #eef1f7; --bg-2: #ffffff; --card: #ffffff;
-  --ink: #0a0a0f; --ink-soft: #1f2028; --muted: #5f6673;
-  --blue: #2d4bff; --blue-dark: #1930d9;
-  --rule: #d4d8e0; --accent: #2d4bff;
-  --chart-tint: #ffffff; --chart-border: #d4d8e0;
-  /* Surfaces that stay ink in both themes (verdict bar, footer). */
-  --fixed-ink: #0a0a0f; --fixed-paper: #eef1f7; --fixed-link: #5b74ff;
-  --wash: rgba(45,75,255,0.06);
-  --grid-line: rgba(45,75,255,0.05);
-  --paper-grid: linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
-                linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
-  /* A sheet laid over another: hard ink edge on top, soft depth behind it. */
-  --cover-shadow: 0 -6px 0 var(--ink), 0 -28px 56px rgba(10,10,15,0.22);
-  --fail: #c8321f;   /* status only: a failed check, always with an icon and the word "Fail" */
-}
-[data-theme="dark"] {
-  --bg: #0a0a10; --bg-2: #15151e; --card: #1b1b26;
-  --ink: #ffffff; --ink-soft: #e4e4e9; --muted: #9ca3af;
-  --blue: #5b74ff; --blue-dark: #3a56ff;
-  --rule: #2a2a38; --accent: #5b74ff;
-  --chart-tint: #ffffff; --chart-border: #2a2a38;
-  --wash: rgba(91,116,255,0.12);
-  --grid-line: rgba(91,116,255,0.07);
-  --cover-shadow: 0 -6px 0 var(--ink), 0 -28px 56px rgba(0,0,0,0.6);
-  --fail: #ff6b57;
-  color-scheme: dark;
-}
-* { box-sizing: border-box; }
-[hidden] { display: none !important; }
-html { scroll-behavior: smooth; }
-html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
-  font-family: 'Inter', -apple-system, 'Segoe UI', sans-serif;
-  font-size: 1rem; line-height: 1.55; -webkit-font-smoothing: antialiased;
-  background-image: var(--paper-grid); background-size: 60px 60px;
-}
-::selection { background: var(--blue); color: #fff; }
-.wrap { display: flex; flex-direction: column; min-height: 100vh; overflow-x: clip; }
-
-/* Three stacked sheets: home (locked) -> Live Proof sheet slides over it (then locks) -> Ledger app screen slides over that.
-   Each sheet is opaque graph paper with a hard ink edge on top. */
-.home { position: sticky; top: 0; z-index: 0; }
-.deck { position: sticky; top: var(--stick-top, 0px); margin-top: 400px; z-index: 2; background-color: var(--bg); background-image: var(--paper-grid);
-  background-size: 60px 60px; box-shadow: var(--cover-shadow); }
-.app { position: relative; z-index: 3; display: flex; flex-direction: column; background-color: var(--bg);
-  box-shadow: var(--cover-shadow); }
-.app-tabs { width: 100%; max-width: 1300px; margin: 0 auto; padding: clamp(.8rem, 2vw, 1.4rem) clamp(1rem, 2.5vw, 2rem) 0; flex: none; }
-.app-tabs .tabs { margin: 0; }
-.app-body { background-color: var(--bg); background-image: var(--paper-grid); background-size: 60px 60px;
-  background-attachment: local; scrollbar-color: var(--ink) transparent; }
-/* App screen: on screens with room for it, the Ledger sheet is exactly one screen tall and is the end of the page.
-   Header and tab bar stay put; only the tab content scrolls, and only once the sheet has reached the top. */
-@media (min-width: 700px) and (min-height: 600px) {
-  .app { height: 100vh; height: 100svh; }
-  .app-body { flex: 1; min-height: 0; overflow-y: hidden; }
-  .app.locked .app-body { overflow-y: auto; }
-  /* One scroller only: long tables run full length inside the content area, with their header row stuck to its top. */
-  .app-body .scroll { max-height: none; overflow: visible; }
-  .app-body .scroll th { top: 0; }
-}
-
-/* Tab changes load in place (no page reload) and slide sideways by tab order: a tab to the right comes in
-   from the right and pushes the old content out left; a tab to the left does the reverse. Tab bar stays put. */
-:root { --ease-slide: cubic-bezier(0.32, 0.72, 0, 1); --dur-slide: .35s; }
-/* The slide moves the scrolling content area only; header and tab bar sit outside it. */
-.app-body { view-transition-name: tab-panel; }
-::view-transition-old(root), ::view-transition-new(root) { animation: none; }
-::view-transition-group(tab-panel) { animation: none; }
-::view-transition-old(tab-panel) { animation: slide-out-left var(--dur-slide) var(--ease-slide) both; }
-::view-transition-new(tab-panel) { animation: slide-in-right var(--dur-slide) var(--ease-slide) both; }
-html[data-slide="back"]::view-transition-old(tab-panel) { animation-name: slide-out-right; }
-html[data-slide="back"]::view-transition-new(tab-panel) { animation-name: slide-in-left; }
-@keyframes slide-out-left { to { transform: translateX(-100vw); } }
-@keyframes slide-out-right { to { transform: translateX(100vw); } }
-@keyframes slide-in-right { from { transform: translateX(100vw); } }
-@keyframes slide-in-left { from { transform: translateX(-100vw); } }
-main { position: relative; }
-.tab-panel-ghost { position: absolute; pointer-events: none; z-index: 0; }
-
-/* Focus: blue ring, offset off the ink edge. */
-:focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
-input:focus-visible, select:focus-visible, textarea:focus-visible {
-  outline: none; border-color: var(--blue) !important; box-shadow: 4px 4px 0 var(--blue); }
-
-.ico { width: 16px; height: 16px; flex: none; stroke: currentColor; fill: none;
-  stroke-width: 2.2; stroke-linecap: square; stroke-linejoin: miter; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-
-html { font-size: clamp(14px, 0.35vw + 10.5px, 17px); }
-
-/* ============ HERO ============ */
-.hero { height: 100vh; height: 100svh; min-height: 22rem; max-width: 1300px; margin: 0 auto; width: 100%;
-  display: flex; flex-direction: column; justify-content: center;
-  padding-block: clamp(1.25rem, 6svh, 4rem); padding-inline: clamp(1rem, 4vw, 2rem); }
-/* Sized by width and by height, so the whole heading fits on short laptop screens and narrow phones alike. */
-.hero-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-  font-size: clamp(2rem, min(9.6vw, 13svh), 7rem); line-height: 0.95; letter-spacing: -0.03em;
-  color: var(--ink); margin: 0 0 clamp(1rem, 3.5svh, 1.8rem); text-transform: uppercase; text-wrap: balance; }
-.hero-title .line { display: block; overflow: hidden; padding-bottom: .04em; }
-.hero-title .line > span { display: block; }
-.hero-title .accent { color: var(--blue); }
-.hero-desc { font-size: clamp(1rem, 0.6rem + 0.9svh, 1.2rem); color: var(--ink-soft); line-height: 1.55; max-width: 40rem;
-  margin: 0 0 clamp(1.2rem, 4svh, 2.4rem); }
-.hero-desc strong { color: var(--ink); font-weight: 700; }
-.hero-cta-row { display: flex; gap: 1rem; flex-wrap: wrap; }
-.btn-blue, .btn-dark { display: inline-flex; align-items: center; gap: .5rem;
-  padding: 1rem 1.8rem; font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: .95rem;
-  letter-spacing: 1px; text-transform: uppercase; text-decoration: none;
-  border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--ink);
-  transition: transform .12s ease, box-shadow .12s ease, background-color .15s ease; }
-.btn-blue { background: var(--blue); color: #fff; }
-.btn-dark { background: var(--card); color: var(--ink); }
-.btn-blue:hover, .btn-dark:hover { transform: translate(-2px,-2px); box-shadow: 8px 8px 0 var(--ink); }
-.btn-blue:active, .btn-dark:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
-
-/* ============ SECTIONS ============ */
-.section { max-width: 1300px; width: 100%; margin: 0 auto; padding-block: clamp(2rem, 5vw, 3rem); padding-inline: clamp(1rem, 3vw, 2rem); }
-.section-title { font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-  font-size: clamp(2rem, 5vw, 3.5rem); line-height: 1; letter-spacing: -0.02em;
-  text-transform: uppercase; margin: 0 0 2rem; color: var(--ink); }
-.section-title .accent { color: var(--blue); }
-
-/* What we do: one ruled sheet with three ledger columns, not three floating cards. */
-.ledger-cols { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--card);
-  border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--ink); }
-.ledger-col { padding: 2rem 1.6rem; }
-.ledger-col + .ledger-col { border-left: 2px solid var(--ink); }
-.ledger-col h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-  font-size: 1.6rem; letter-spacing: -0.01em; text-transform: uppercase;
-  color: var(--ink); margin: 0 0 .6rem; }
-.ledger-col h3 .accent { color: var(--blue); }
-.ledger-col p { color: var(--ink-soft); margin: 0; line-height: 1.55; }
-
-.proof-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
-.proof-card { background: var(--card); border: 2px solid var(--ink);
-  padding: 1.8rem; box-shadow: 6px 6px 0 var(--ink); display: flex; gap: 1.5rem; align-items: center; }
-.proof-stat { font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-  font-size: 2.8rem; line-height: 1; color: var(--blue); min-width: 160px; text-align: center;
-  padding: 1.2rem .8rem; background: var(--bg); border: 2px solid var(--ink);
-  font-variant-numeric: tabular-nums; }
-.proof-stat .sub { display: block; font-size: .72rem; color: var(--ink);
-  letter-spacing: 1.5px; margin-top: .4rem; text-transform: uppercase; font-weight: 600; }
-.proof-body { flex: 1; min-width: 0; }
-.proof-body h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-  font-size: 1.3rem; text-transform: uppercase; color: var(--ink); margin: 0 0 .3rem;
-  letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.proof-body .proof-note { color: var(--muted); font-size: .85rem; margin: 0 0 .9rem; }
-.proof-body .btn-blue { padding: .7rem 1.2rem; font-size: .82rem; box-shadow: 4px 4px 0 var(--ink); }
-.proof-body .btn-blue:hover { box-shadow: 6px 6px 0 var(--ink); }
-
-/* ============ TOP BAR + TABS ============ */
-header.topbar { background: var(--bg-2); border-top: 2px solid var(--ink);
-  border-bottom: 2px solid var(--ink); padding: 1.2rem 2rem; }
-header.topbar .row { display: flex; flex-wrap: wrap; gap: 1rem 1.4rem;
-  align-items: flex-end; justify-content: space-between; max-width: 1300px; margin: 0 auto; }
-header.topbar .brand { display: flex; flex-direction: column; min-width: 0; flex: 1 1 260px; }
-header.topbar .brand h2 { font-size: 1.6rem; margin: 0; color: var(--ink); line-height: 1.15;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700; letter-spacing: -0.01em;
-  text-transform: uppercase; }
-header.topbar .brand .caption { color: var(--muted); font-size: .85rem; margin: .25rem 0 0; max-width: 46ch; }
-header.topbar form.params { display: flex; gap: .8rem; align-items: flex-end; flex-wrap: wrap; }
-header.topbar form.params label { display: flex; flex-direction: column; color: var(--muted);
-  font-size: .72rem; gap: .3rem; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
-header.topbar form.params input[type=number] { width: 100px; padding: .55rem .7rem;
-  background: var(--bg); color: var(--ink); border: 2px solid var(--ink); border-radius: 0;
-  font-family: 'JetBrains Mono', monospace; font-size: .95rem; text-align: center;
-  -moz-appearance: textfield; transition: border-color .15s ease, box-shadow .15s ease; }
-header.topbar form.params input[type=number]::-webkit-outer-spin-button,
-header.topbar form.params input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-header.topbar .reports { display: flex; gap: .5rem; align-items: flex-end; flex-wrap: wrap; }
-
-button, .btn { display: inline-flex; align-items: center; gap: .45rem;
-  padding: .6rem 1rem; background: var(--card); color: var(--ink);
-  border: 2px solid var(--ink); border-radius: 0;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: .82rem;
-  letter-spacing: 1px; text-transform: uppercase; cursor: pointer; text-decoration: none;
-  transition: background-color .15s ease, color .15s ease; }
-button:hover, .btn:hover { background: var(--blue); color: #fff; }
-.btn-primary { background: var(--blue); color: #fff; }
-.btn-primary:hover { background: var(--blue-dark); }
-.theme-toggle { width: 40px; height: 40px; padding: 0; justify-content: center;
-  background: var(--ink); color: var(--bg); border: 2px solid var(--ink); }
-.theme-toggle:hover { background: var(--blue); color: #fff; }
-.theme-toggle .ico { width: 18px; height: 18px; }
-.theme-toggle .ico-sun, [data-theme="dark"] .theme-toggle .ico-moon { display: none; }
-[data-theme="dark"] .theme-toggle .ico-sun { display: block; }
-
-main { padding: clamp(1rem, 2.5vw, 2rem); max-width: 1300px; margin: 0 auto; width: 100%; }
-
-/* Folder tabs on an ink rule; the strip scrolls sideways on narrow screens. */
-.tabs { margin: 0 0 2rem; display: flex; flex-wrap: nowrap; overflow-x: auto;
-  box-shadow: inset 0 -2px 0 var(--ink); scrollbar-width: thin; }
-.tabs a { flex: none; padding: .9rem 1.4rem; color: var(--ink); text-decoration: none;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 600; font-size: .9rem;
-  letter-spacing: .5px; text-transform: uppercase; white-space: nowrap;
-  border: 2px solid transparent; margin-right: .2rem; transition: color .15s ease; }
-.tabs a:hover { color: var(--blue); }
-.tabs a:focus-visible { outline-offset: -5px; }
-.tabs a.active { color: var(--ink); background: var(--card);
-  border-color: var(--ink); border-bottom-color: var(--card); }
-
-.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 1rem;
-  margin: .6rem 0 1.6rem; }
-.kpi { background: var(--card); border: 2px solid var(--ink); padding: 1rem 1.1rem;
-  box-shadow: 4px 4px 0 var(--ink); }
-.kpi .label { font-size: .72rem; color: var(--muted); font-weight: 600;
-  text-transform: uppercase; letter-spacing: 1px; }
-.kpi .value { font-size: 1.75rem; color: var(--ink); margin-top: .3rem; font-weight: 700;
-  font-variant-numeric: tabular-nums; letter-spacing: -0.01em;
-  font-family: 'Space Grotesk', sans-serif; }
-
-.chart { background: var(--chart-tint); border: 2px solid var(--ink); padding: .8rem;
-  margin-bottom: 1.2rem; min-height: 380px; box-shadow: 4px 4px 0 var(--ink); min-width: 0; }
-.grid-2 { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 1.2rem; }
-
-.sub-title { color: var(--ink); font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-  text-transform: uppercase; letter-spacing: -0.01em; font-size: 1.5rem; margin: 2.2rem 0 .8rem; line-height: 1.15; }
-
-table { width: 100%; border-collapse: collapse; background: var(--card);
-  border: 2px solid var(--ink); font-size: .9rem; }
-th, td { padding: .55rem .7rem; border-bottom: 1px solid var(--rule); text-align: left;
-  vertical-align: top; font-variant-numeric: tabular-nums; color: var(--ink); }
-th { background: var(--ink); color: var(--bg); font-family: 'Space Grotesk', sans-serif;
-  font-weight: 600; text-transform: uppercase; letter-spacing: 1px; font-size: .75rem;
-  position: sticky; top: 0; z-index: 1; }
-td { transition: background-color .12s ease; }
-tr:hover td { background: var(--wash); }
-td.nowrap, th.nowrap { white-space: nowrap; }
-td.num, th.num { text-align: right; white-space: nowrap; }
-td.stake { font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
-td.found { color: var(--blue); font-weight: 600; }
-td.why { color: var(--ink-soft); min-width: 18rem; }
-.table-wrap { overflow-x: auto; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
-.table-wrap table { border: none; }
-
-.filter-row { display: flex; gap: .6rem; margin-bottom: .8rem; align-items: center; flex-wrap: wrap; }
-.filter-row input[type=text], .filter-row select { padding: .55rem .7rem; background: var(--card);
-  color: var(--ink); border: 2px solid var(--ink); border-radius: 0;
-  font-family: 'Inter', sans-serif; font-size: .92rem; transition: border-color .15s ease, box-shadow .15s ease; }
-.filter-row input[type=text] { width: 320px; max-width: 100%; }
-.filter-row select { min-width: 180px; font-weight: 500; }
-.scroll { max-height: 560px; overflow: auto; border: 2px solid var(--ink);
-  box-shadow: 4px 4px 0 var(--ink); }
-.scroll table { border: none; }
-.note { color: var(--muted); font-size: .85rem; margin-top: .4rem; max-width: 80ch; }
-.note strong { color: var(--ink); }
-.defs { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .4rem 1.6rem;
-  margin: 1rem 0 0; padding: 0; list-style: none; font-size: .85rem; color: var(--muted); }
-.defs b { color: var(--ink); font-weight: 600; }
-
-/* Accuracy: exact-only -> full matching */
-.cmp td.arrow { white-space: nowrap; }
-.cmp .from { color: var(--muted); }
-.cmp .to { font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
-.cmp .delta { display: inline-block; margin-left: .5rem; font-size: .8rem; font-weight: 700; color: var(--muted); }
-.cmp tr.changed td { background: var(--wash); }
-.cmp tr.changed .delta { color: var(--blue); }
-.cmp tr.changed td:first-child { font-weight: 700; }
-
-/* Verification rings */
-.verify-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2rem; align-items: center;
-  background: var(--card); border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--blue); padding: 1.6rem 2rem; margin-bottom: 1.8rem; }
-.verify-hero h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-transform: uppercase;
-  font-size: 1.6rem; letter-spacing: -0.01em; line-height: 1.1; margin: 0 0 .5rem; }
-.verify-hero p { margin: 0 0 .4rem; color: var(--ink-soft); max-width: 60ch; }
-.verify-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; }
-.check { background: var(--card); border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
-  padding: 1.3rem 1.2rem 1.2rem; display: grid; justify-items: center; text-align: center; gap: .55rem; min-width: 0; }
-.check h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-transform: uppercase; font-size: .95rem;
-  letter-spacing: .01em; line-height: 1.2; margin: .2rem 0 0; text-wrap: balance; }
-.check .detail { font-size: .82rem; color: var(--muted); margin: 0; text-wrap: pretty; }
-.ring { position: relative; display: grid; place-items: center; width: 148px; aspect-ratio: 1; max-width: 100%; }
-.ring.big { width: 200px; }
-.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
-.ring .track { fill: none; stroke: var(--rule); }
-.ring .fill { fill: none; stroke: var(--blue); stroke-linecap: butt; }
-.ring.fail .fill { stroke: var(--fail); }
-html.motion .ring .fill { stroke-dashoffset: var(--c); } /* start empty; GSAP fills to the score */
-.ring .score { position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
-.ring .score b { font-size: 1.65rem; letter-spacing: -0.02em; }
-.ring.big .score b { font-size: 2.8rem; }
-.ring .score small { font-size: .68rem; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-top: .35rem; }
-.verdict-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .6rem; border: 2px solid var(--ink);
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: .75rem; letter-spacing: 1px; text-transform: uppercase; }
-.verdict-chip.pass { background: var(--blue); border-color: var(--blue); color: #fff; }
-.verdict-chip.fail { background: var(--card); border-color: var(--fail); color: var(--fail); }
-.verdict-chip .ico { width: 14px; height: 14px; }
-@media (max-width: 900px) { .verify-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 560px) {
-  .verify-grid { grid-template-columns: minmax(0, 1fr); }
-  .verify-hero { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; padding: 1.4rem 1rem; }
-}
-
-/* Example exhibit */
-.example-card { background: var(--card); border: 2px solid var(--ink);
-  padding: 1.4rem 1.6rem; margin: 0 0 1.6rem; position: relative; padding-right: 3.4rem;
-  box-shadow: 6px 6px 0 var(--blue); }
-.example-card h3 { margin: 0 0 .3rem; color: var(--ink); display: flex; align-items: center; gap: .5rem;
-  font-family: 'Space Grotesk', sans-serif; font-size: 1.3rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: -0.01em; }
-.example-card h3 .ico { width: 18px; height: 18px; color: var(--blue); }
-.example-card .ex-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; margin-top: 1rem; }
-.ex-src { border: 2px solid var(--ink); padding: .85rem 1rem; background: var(--bg); min-width: 0; }
-.ex-src .label { color: var(--blue); font-size: .72rem; letter-spacing: 1.5px;
-  text-transform: uppercase; margin-bottom: .5rem; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
-.ex-src .big { font-size: 1.2rem; font-weight: 700; color: var(--ink); margin-bottom: .4rem;
-  font-variant-numeric: tabular-nums; font-family: 'Space Grotesk', sans-serif; }
-.ex-src .line { font-size: .88rem; color: var(--ink); margin: .2rem 0; font-variant-numeric: tabular-nums; }
-.ex-src .mono { font-family: 'JetBrains Mono', monospace; font-size: .78rem; color: var(--muted); overflow-wrap: anywhere; }
-.ex-highlight { color: var(--blue); font-weight: 700; }
-.ex-verdict { margin-top: .9rem; padding: .7rem 1rem; background: var(--fixed-ink); color: var(--fixed-paper);
-  font-size: .9rem; font-weight: 500; display: flex; gap: .5rem; align-items: baseline; }
-.ex-verdict .ico { color: var(--fixed-link); position: relative; top: 2px; }
-.ex-verdict strong { color: #fff; }
-
-.close-x { position: absolute; top: 10px; right: 12px; width: 36px; height: 36px;
-  justify-content: center; padding: 0; background: var(--card); color: var(--ink); }
-.close-x .ico { width: 16px; height: 16px; }
-.restore-strip { font-size: .82rem; color: var(--muted); margin-bottom: .9rem; display: flex; gap: .6rem; align-items: center; }
-.link-btn { background: none; border: none; padding: 0; color: var(--blue); text-decoration: underline;
-  text-underline-offset: 3px; font-family: 'Inter', sans-serif; font-weight: 600; font-size: .82rem;
-  letter-spacing: 0; text-transform: none; }
-.link-btn:hover { background: none; color: var(--blue-dark); }
-
-/* Loader */
-.overlay { position: fixed; inset: 0; background: rgba(238,241,247,0.3);
-  backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px);
-  display: none; align-items: center; justify-content: center; z-index: 999; }
-[data-theme="dark"] .overlay { background: rgba(10,10,16,0.4); }
-.overlay.on { display: flex; }
-.overlay .box { background: var(--card); border: 2px solid var(--ink);
-  padding: 1.8rem 2.6rem; text-align: center; min-width: 260px; box-shadow: 8px 8px 0 var(--blue); }
-.overlay .box-title { font-family: 'Space Grotesk', sans-serif; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-.ink-dots { display: flex; gap: 12px; justify-content: center; margin-bottom: .9rem; }
-.ink-dots span { width: 14px; height: 14px; background: var(--blue);
-  opacity: .25; animation: inkPulse 1.1s ease-in-out infinite; }
-.ink-dots span:nth-child(2) { animation-delay: 0.18s; }
-.ink-dots span:nth-child(3) { animation-delay: 0.36s; }
-@keyframes inkPulse { 0%, 70%, 100% { opacity: .25; transform: scale(1); }
-  35% { opacity: 1; transform: scale(1.4); } }
-@media (prefers-reduced-motion: reduce) { .ink-dots span { animation: none; opacity: .8; } html { scroll-behavior: auto; } }
-.ink-quote { font-family: 'Space Grotesk', sans-serif; font-size: .78rem;
-  color: var(--muted); margin-top: .5rem; letter-spacing: 1px; text-transform: uppercase; }
-
-/* Ask */
-.ask-wrap { max-width: 720px; margin: 1.5rem auto; text-align: center; }
-.ask-wrap h2 { font-size: 1.9rem; color: var(--ink); margin: 0 0 .6rem;
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: -0.01em; }
-.ask-wrap p { color: var(--muted); margin: 0 0 1.6rem; }
-.ask-form { display: flex; flex-direction: column; gap: 1rem; }
-.ask-form textarea { width: 100%; min-height: 120px; padding: 1rem;
-  background: var(--card); color: var(--ink); border: 2px solid var(--ink);
-  font-family: inherit; font-size: .95rem; resize: vertical; transition: border-color .15s ease, box-shadow .15s ease; }
-.ask-form button { align-self: center; padding: 1rem 2rem; font-size: .9rem;
-  background: var(--blue); color: #fff; border: 2px solid var(--ink);
-  box-shadow: 6px 6px 0 var(--ink); transition: transform .12s ease, box-shadow .12s ease, background-color .15s ease; }
-.ask-form button:hover { background: var(--blue-dark); transform: translate(-2px,-2px); box-shadow: 8px 8px 0 var(--ink); }
-.ask-form button:active { transform: translate(2px,2px); box-shadow: 2px 2px 0 var(--ink); }
-.ask-wrap .note { margin: 1rem auto 0; }
-
-/* Footer: always ink, in both themes. */
-footer.dark-footer { background: var(--fixed-ink); color: var(--fixed-paper); padding: 3rem 2rem 2rem;
-  margin-top: 3rem; position: relative; overflow: hidden; border-top: 2px solid var(--ink); }
-.footer-ghost { position: absolute; bottom: -15px; left: 50%; transform: translateX(-50%);
-  font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-  font-size: clamp(5rem, 15vw, 11rem); line-height: 1; letter-spacing: -0.03em;
-  color: rgba(255,255,255,0.05); text-transform: uppercase; white-space: nowrap;
-  pointer-events: none; user-select: none; }
-.footer-content { max-width: 1300px; margin: 0 auto; display: flex; flex-wrap: wrap;
-  justify-content: space-between; gap: 2rem; position: relative; z-index: 1; padding-bottom: 6rem; }
-.footer-col .label { font-family: 'Space Grotesk', sans-serif; font-size: .72rem;
-  letter-spacing: 2px; color: rgba(255,255,255,0.6); text-transform: uppercase; margin-bottom: .5rem; font-weight: 600; }
-.footer-col .value { font-family: 'Space Grotesk', sans-serif; font-size: 1.1rem; font-weight: 600; color: #fff; overflow-wrap: anywhere; }
-.footer-col .value a { color: var(--fixed-link); text-decoration: none; }
-.footer-col .value a:hover { text-decoration: underline; text-underline-offset: 4px; }
-.footer-nav { display: flex; gap: 2rem; align-items: center; flex-wrap: wrap; }
-.footer-nav a { color: #fff; text-decoration: none; font-family: 'Space Grotesk', sans-serif;
-  font-weight: 600; font-size: .9rem; letter-spacing: .5px; text-transform: uppercase; transition: color .15s ease; }
-.footer-nav a:hover { color: var(--fixed-link); }
-footer :focus-visible { outline-color: var(--fixed-link); }
-
-@media (max-width: 900px) {
-  .grid-2 { grid-template-columns: minmax(0,1fr); }
-  .proof-grid, .ledger-cols { grid-template-columns: 1fr; }
-  .ledger-col + .ledger-col { border-left: none; border-top: 2px solid var(--ink); }
-  .example-card .ex-grid { grid-template-columns: 1fr; }
-  header.topbar { padding: 1rem; }
-  footer.dark-footer { padding: 2.4rem 1rem 1.6rem; }
-}
-@media (max-width: 560px) {
-  header.topbar form.params { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); width: 100%; }
-  header.topbar form.params input[type=number] { width: 100%; }
-  header.topbar form.params button[type=submit] { grid-column: 1 / -1; justify-content: center; }
-  header.topbar .reports { width: 100%; }
-  .proof-card { flex-direction: column; align-items: stretch; }
-  .proof-stat { min-width: 0; }
-  .example-card { padding: 1.2rem 1rem; padding-top: 3.2rem; }
-  .filter-row input[type=text], .filter-row select { width: 100%; min-width: 0; }
-}
-</style>
+<link rel="stylesheet" href="{{ asset('app.css') }}">
 </head>
 <body>
-<svg width="0" height="0" style="position:absolute" aria-hidden="true">
-  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12M6 10l6 6 6-6M4 21h16"/></symbol>
-  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4l12 8-12 8z"/></symbol>
-  <symbol id="i-search" viewBox="0 0 24 24"><path d="M10.5 3a7.5 7.5 0 1 0 0 15 7.5 7.5 0 0 0 0-15zM16 16l5 5"/></symbol>
-  <symbol id="i-close" viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></symbol>
-  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5 21V3h12l-2 4 2 4H5"/></symbol>
-  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
-  <symbol id="i-sun" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 1v3M12 20v3M1 12h3M20 12h3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></symbol>
-  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
-  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol>
-</svg>
+{% include "_sprite.html" %}
 
 <div class="overlay" id="loader" role="status" aria-live="polite">
   <div class="box">
@@ -459,6 +48,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 <div class="wrap">
 
 <div class="home" id="home">
+{% include "_nav.html" %}
 <section class="hero">
   <h1 class="hero-title">
     <span class="line"><span>Smart</span></span>
@@ -518,6 +108,41 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 </div>
 
 <div class="app" id="app">
+{% if locked %}
+<header class="topbar" id="dashboard">
+  <div class="row">
+    <div class="brand">
+      <h2>Ledger &amp; Reconciliation</h2>
+      <p class="caption">The dashboard needs an account. Log in, sign up, or use the demo account.</p>
+    </div>
+    <div class="reports">
+      <a class="btn" href="/login?next=%2F%23dashboard">Log in</a>
+      <a class="btn btn-primary" href="/signup?next=%2F%23dashboard">Sign up</a>
+    </div>
+  </div>
+</header>
+<div class="app-body gate" id="appBody">
+  <section class="gate-card" aria-labelledby="gateTitle">
+    <h2 id="gateTitle">Log in to open the dashboard</h2>
+    <p>Inside: every flagged record with its evidence and next step, invoice, payment and ledger side by side, GST totals ready for a report, verification checks, and Ask the Ledger.</p>
+    <ul>
+      <li>Filter and sort flags by vendor, error type and amount; export exactly what you see.</li>
+      <li>Click any record to see where the invoice, the bank and the ledger disagree.</li>
+      <li>Ask questions about the run; answers come only from its data.</li>
+    </ul>
+    <div class="demo-line">Demo login: {{ demo_email }} / {{ demo_password }}</div>
+    <div class="hero-cta-row">
+      <form method="post" action="/login">
+        <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+        <input type="hidden" name="email" value="{{ demo_email }}"><input type="hidden" name="password" value="{{ demo_password }}">
+        <input type="hidden" name="next" value="/?tab={{ active }}#dashboard">
+        <button type="submit" class="btn-blue">Log in as demo <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+      </form>
+      <a class="btn-dark" href="/signup?next=%2F%23dashboard">Create an account</a>
+    </div>
+  </section>
+</div>
+{% else %}
 <header class="topbar" id="dashboard">
   <div class="row">
     <div class="brand">
@@ -526,7 +151,6 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     </div>
     <form method="get" action="/" class="params" id="paramForm">
       <input type="hidden" name="tab" value="{{ active }}">
-      {% if active == 'flagged' %}{% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}{% if kind != 'All' %}<input type="hidden" name="kind" value="{{ kind }}">{% endif %}{% endif %}
       <label>Invoices<input type="number" name="n" min="500" max="5000" step="100" value="{{ n }}"></label>
       <label>Error rate (%)<input type="number" name="rate" min="2" max="25" step="1" value="{{ rate }}"></label>
       <label title="Same seed = same generated data. Change it to get a fresh set.">Seed<input type="number" name="seed" min="0" max="999999" value="{{ seed }}"></label>
@@ -535,6 +159,8 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     <div class="reports">
       <a class="btn" href="/download/excel?n={{ n }}&rate={{ rate }}&seed={{ seed }}"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>Excel</a>
       <a class="btn" href="/download/flagged?n={{ n }}&rate={{ rate }}&seed={{ seed }}"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>CSV</a>
+      <span class="user-chip"><span class="who" title="{{ current_user.email }}">{{ current_user.name }}</span>
+        <form method="post" action="/logout"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="btn">Log out</button></form></span>
       <button type="button" class="theme-toggle" id="themeBtn" aria-label="Switch to dark theme">
         <svg class="ico ico-moon" aria-hidden="true"><use href="#i-moon"/></svg>
         <svg class="ico ico-sun" aria-hidden="true"><use href="#i-sun"/></svg>
@@ -545,7 +171,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 
 <div class="app-tabs">
   <nav class="tabs" aria-label="Dashboard sections">
-    {% set tabs = [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy'),('verify','Verification'),('query','Query')] %}
+    {% set tabs = [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy'),('verify','Verification'),('query','Ask the Ledger')] %}
     {% for t, lbl in tabs %}
       <a href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab={{t}}{% if t=='flagged' and q %}&q={{q}}{% endif %}{% if t=='flagged' and kind!='All' %}&kind={{kind}}{% endif %}#dashboard" class="{% if active==t %}active{% endif %}"{% if active==t %} aria-current="page"{% endif %}>{{ lbl }}</a>
     {% endfor %}
@@ -555,6 +181,10 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 <div class="app-body" id="appBody">
 <main>
   <div class="tab-panel" id="tabPanel">
+{% macro sorth(f, key, label, cls='') -%}
+  {%- set on = f.sort == key -%}
+  <th class="{{ cls }}"{% if on %} aria-sort="{{ 'descending' if f.order == 'desc' else 'ascending' }}"{% endif %}><a class="sort{% if on %} on{% endif %}" href="{{ url_with(sort=key, order=('asc' if on and f.order == 'desc' else 'desc')) }}">{{ label }}{% if on %}<svg class="ico" aria-hidden="true"><use href="#i-{{ 'down' if f.order == 'desc' else 'up' }}"/></svg>{% endif %}</a></th>
+{%- endmacro %}
   {% if active == 'summary' %}
     <div class="restore-strip" id="restoreStrip" hidden><span>Example hidden.</span> <button type="button" class="link-btn" id="showExample">Show example</button></div>
     {% if example %}
@@ -608,31 +238,43 @@ footer :focus-visible { outline-color: var(--fixed-link); }
             Plotly.newPlot('bars', {{ bars.data|tojson }}, {{ bars.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
 
   {% elif active == 'flagged' %}
-    <form method="get" action="/" class="filter-row" role="search">
+    <form method="get" action="/" class="filter-bar" role="search" aria-label="Filter flagged records">
       <input type="hidden" name="n" value="{{n}}"><input type="hidden" name="rate" value="{{rate}}">
       <input type="hidden" name="seed" value="{{seed}}"><input type="hidden" name="tab" value="flagged">
-      <label class="sr-only" for="kindSel">Problem type</label>
-      <select name="kind" id="kindSel">
-        {% for k in kinds %}<option value="{{k}}" {% if k==kind %}selected{% endif %}>{{ 'All problem types' if k == 'All' else k }}</option>{% endfor %}
-      </select>
-      <label class="sr-only" for="qInput">Search</label>
-      <input type="text" name="q" id="qInput" placeholder="Search party, invoice or reason" value="{{q}}">
-      <button type="submit" class="btn-primary"><svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>Search</button>
-      {% if q or kind != 'All' %}<a class="btn" href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab=flagged#dashboard">Clear</a>{% endif %}
+      <input type="hidden" name="sort" value="{{ ff.sort }}"><input type="hidden" name="order" value="{{ ff.order }}">
+      <label class="fld fld-wide"><span>Search</span><input type="text" name="q" value="{{ ff.q }}" placeholder="Invoice, party, GSTIN or reason"></label>
+      <label class="fld"><span>Problem</span><select name="kind">
+        {% for k in kinds %}<option value="{{k}}" {% if k==ff.kind %}selected{% endif %}>{{ 'All problem types' if k == 'All' else k }}</option>{% endfor %}
+      </select></label>
+      <label class="fld"><span>Vendor / party</span><input type="text" name="party" value="{{ ff.party }}" list="partyList" placeholder="Any party"></label>
+      <datalist id="partyList">{% for pt in parties %}<option value="{{ pt }}">{% endfor %}</datalist>
+      <label class="fld fld-amt"><span>Amount from</span><input type="text" name="min" value="{{ request.args.get('min','') }}" placeholder="e.g. 50000" inputmode="decimal"></label>
+      <label class="fld fld-amt"><span>to</span><input type="text" name="max" value="{{ request.args.get('max','') }}" placeholder="e.g. 2L" inputmode="decimal"></label>
+      <div class="fld-actions">
+        <button type="submit" class="btn-primary"><svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>Apply</button>
+        {% if ff.q or ff.kind != 'All' or ff.party or request.args.get('min') or request.args.get('max') %}<a class="btn" href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab=flagged#dashboard">Clear</a>{% endif %}
+      </div>
     </form>
-    {% if total_filtered == 0 %}
-      <p class="note">No records match this filter. Try another problem type or clear the search.</p>
-    {% else %}
-      {% set shown = (flagged|length) - 1 %}
-      <p class="note">{% if shown < total_filtered %}Showing the {{ shown }} biggest of {{ total_filtered }} flagged records.{% else %}{{ total_filtered }} flagged records.{% endif %} Largest ₹ at stake first; <strong>Found</strong> is the value that disagrees.</p>
-      <div class="scroll"><table>
-        <thead><tr>{% for c in flagged[0] %}<th class="{% if loop.index0 == 3 %}nowrap{% elif loop.index0 == 6 %}num{% endif %}">{{c}}</th>{% endfor %}</tr></thead>
-        <tbody>{% for row in flagged[1:] %}<tr>
-          <td class="nowrap">{{ row[0] }}</td><td class="nowrap">{{ row[1] }}</td><td>{{ row[2] }}</td>
-          <td class="nowrap">{{ row[3] }}</td><td>{{ row[4] }}</td><td class="found">{{ row[5] }}</td>
-          <td class="num stake">{{ row[6] }}</td><td class="why">{{ row[7] }}</td>
-        </tr>{% endfor %}</tbody>
-      </table></div>
+    <div class="table-tools">
+      <p class="note">{% if total_filtered == 0 %}No records match these filters.{% elif total_filtered > flag_list|length %}Showing the first {{ flag_list|length }} of <strong>{{ total_filtered }}</strong> matching records.{% else %}<strong>{{ total_filtered }}</strong> matching records.{% endif %} Click a row to see the invoice, payment and ledger entry side by side.</p>
+      <div class="exports" aria-label="Export this view">
+        <a class="btn" href="/export/flagged.xlsx?{{ qs() }}"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>Excel</a>
+        <a class="btn" href="/export/flagged.csv?{{ qs() }}"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>CSV</a>
+      </div>
+    </div>
+    {% if flag_list %}
+    <div class="scroll"><table class="records">
+      <thead><tr>
+        {{ sorth(ff, 'problem', 'Problem') }}{{ sorth(ff, 'invoice', 'Invoice / payment', 'nowrap') }}{{ sorth(ff, 'party', 'Party') }}
+        {{ sorth(ff, 'date', 'Date', 'nowrap') }}{{ sorth(ff, 'amount', 'Amount', 'num') }}<th>Expected</th><th>Found</th>
+        {{ sorth(ff, 'stake', '₹ at stake', 'num') }}<th>Why it was flagged</th>
+      </tr></thead>
+      <tbody>{% for r in flag_list %}<tr class="rec" data-rec="{{ r.id }}" tabindex="0" aria-label="Open {{ r.id }}">
+        <td class="nowrap">{{ r.problem }}</td><td class="nowrap"><span class="rec-id">{{ r.id }}</span></td><td>{{ r.party }}</td>
+        <td class="nowrap">{{ r.date }}</td><td class="num">{{ r.amount }}</td><td>{{ r.expected }}</td><td class="found">{{ r.found }}</td>
+        <td class="num stake">{{ r.stake }}</td><td class="why">{{ r.why }}</td>
+      </tr>{% endfor %}</tbody>
+    </table></div>
     {% endif %}
 
   {% elif active == 'tax' %}
@@ -646,6 +288,45 @@ footer :focus-visible { outline-color: var(--fixed-link); }
       <li><b>ITC at risk</b>: input tax credit on purchase invoices that are not fully matched, so the credit may not hold.</li>
       <li><b>Tax gap on wrong-GST</b>: tax charged minus the tax the GST rate actually gives, summed over flagged invoices.</li>
     </ul>
+    {% set A = tax_b.as_filed %}{% set C = tax_b.clean %}
+    <div class="table-tools" style="margin-top:1.6rem;">
+      <h2 class="sub-title" style="margin:0;">GST summary, {{ tax_b.period }}</h2>
+      <div class="exports">
+        <button type="button" class="btn" data-copy="taxText"><svg class="ico" aria-hidden="true"><use href="#i-copy"/></svg><span>Copy summary</span></button>
+        <a class="btn" href="/export/tax.xlsx?{{ qs() }}"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>Excel</a>
+        <a class="btn" href="/export/tax.csv?{{ qs() }}"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>CSV</a>
+      </div>
+    </div>
+    <div class="grid-2 tax-grid">
+      <div class="table-wrap"><table class="ledger-table">
+        <thead><tr><th></th><th class="num">As filed</th><th class="num">Clean only</th><th class="num">Difference</th></tr></thead>
+        <tbody>
+          <tr><td>Taxable sales</td><td class="num">{{ rupees(A.taxable_sales) }}</td><td class="num">{{ rupees(C.taxable_sales) }}</td><td class="num">{{ rupees(A.taxable_sales - C.taxable_sales) }}</td></tr>
+          <tr><td>Output tax</td><td class="num">{{ rupees(A.output_tax) }}</td><td class="num">{{ rupees(C.output_tax) }}</td><td class="num">{{ rupees(A.output_tax - C.output_tax) }}</td></tr>
+          <tr><td>Taxable purchases</td><td class="num">{{ rupees(A.taxable_purchases) }}</td><td class="num">{{ rupees(C.taxable_purchases) }}</td><td class="num">{{ rupees(A.taxable_purchases - C.taxable_purchases) }}</td></tr>
+          <tr><td>Input tax credit</td><td class="num">{{ rupees(A.itc) }}</td><td class="num">{{ rupees(C.itc) }}</td><td class="num">{{ rupees(A.itc - C.itc) }}</td></tr>
+          <tr class="total"><td>Net GST payable</td><td class="num">{{ rupees(A.net) }}</td><td class="num">{{ rupees(C.net) }}</td><td class="num">{{ rupees(A.net - C.net) }}</td></tr>
+          <tr><td>Invoices</td><td class="num">{{ '{:,}'.format(A.invoices) }}</td><td class="num">{{ '{:,}'.format(C.invoices) }}</td><td class="num">{{ '{:,}'.format(A.invoices - C.invoices) }}</td></tr>
+        </tbody>
+      </table></div>
+      <div class="table-wrap"><table class="ledger-table">
+        <thead><tr><th>Adjustments to review</th><th class="num">₹</th></tr></thead>
+        <tbody>
+          <tr><td>ITC at risk (purchases not fully matched)</td><td class="num">{{ rupees(tax_b.itc_at_risk) }}</td></tr>
+          <tr><td>Excess tax charged on wrong-GST invoices</td><td class="num">{{ rupees(tax_b.excess_tax_charged) }}</td></tr>
+          <tr><td>Tax short-charged on wrong-GST invoices</td><td class="num">{{ rupees(tax_b.short_tax_charged) }}</td></tr>
+          <tr><td>Wrong-GST invoices</td><td class="num">{{ tax_b.wrong_gst_invoices }}</td></tr>
+          <tr><td>Invoices left out of the clean figures</td><td class="num">{{ '{:,}'.format(tax_b.excluded) }}</td></tr>
+        </tbody>
+      </table></div>
+    </div>
+    <h2 class="sub-title">By GST rate</h2>
+    <div class="table-wrap"><table class="ledger-table">
+      <thead><tr><th>Rate</th><th class="num">Taxable sales</th><th class="num">Output tax</th><th class="num">Taxable purchases</th><th class="num">ITC</th><th class="num">Invoices</th></tr></thead>
+      <tbody>{% for r in tax_b.slabs %}<tr><td>{{ r.rate }}</td><td class="num">{{ rupees(r.sales_taxable) }}</td><td class="num">{{ rupees(r.output_tax) }}</td><td class="num">{{ rupees(r.purchase_taxable) }}</td><td class="num">{{ rupees(r.itc) }}</td><td class="num">{{ '{:,}'.format(r.invoices) }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+    <p class="note">Exact rupees, so figures can go straight into a working paper. Duplicates are left out of the by-rate table.</p>
+    <textarea id="taxText" class="sr-only" readonly tabindex="-1" aria-hidden="true">{{ tax_text }}</textarea>
     <div class="chart" id="gst" style="margin-top:1.4rem;"></div>
     <h2 class="sub-title">Monthly figures</h2>
     <div class="table-wrap"><table>
@@ -661,12 +342,44 @@ footer :focus-visible { outline-color: var(--fixed-link); }
       <div class="chart" id="hist"></div>
       <div class="chart" id="scat"></div>
     </div>
-    <h2 class="sub-title">Top 25 most unusual invoices</h2>
-    <div class="scroll"><table>
-      <thead><tr>{% for c in anomaly_tbl[0] %}<th class="{% if loop.index0 == 2 %}nowrap{% elif loop.index0 in [3,5] %}num{% endif %}">{{c}}</th>{% endfor %}</tr></thead>
-      <tbody>{% for row in anomaly_tbl[1:] %}<tr>{% for c in row %}<td class="{% if loop.index0 in [0,2] %}nowrap{% elif loop.index0 in [3,5] %}num{% endif %}">{{c}}</td>{% endfor %}</tr>{% endfor %}</tbody>
+    <h2 class="sub-title">Unusual invoices</h2>
+    <form method="get" action="/" class="filter-bar" role="search" aria-label="Filter unusual records">
+      <input type="hidden" name="n" value="{{n}}"><input type="hidden" name="rate" value="{{rate}}">
+      <input type="hidden" name="seed" value="{{seed}}"><input type="hidden" name="tab" value="anomaly">
+      <input type="hidden" name="sort" value="{{ uf.sort }}"><input type="hidden" name="order" value="{{ uf.order }}">
+      <label class="fld fld-wide"><span>Search</span><input type="text" name="q" value="{{ uf.q }}" placeholder="Invoice, party, GSTIN or reason"></label>
+      <label class="fld"><span>Show</span><select name="show">
+        <option value="marked" {% if uf.only_marked %}selected{% endif %}>Marked unusual ({{ marked_count }})</option>
+        <option value="all" {% if not uf.only_marked %}selected{% endif %}>All invoices, by score</option>
+      </select></label>
+      <label class="fld"><span>Vendor / party</span><input type="text" name="party" value="{{ uf.party }}" list="partyList2" placeholder="Any party"></label>
+      <datalist id="partyList2">{% for pt in parties %}<option value="{{ pt }}">{% endfor %}</datalist>
+      <label class="fld fld-amt"><span>Amount from</span><input type="text" name="min" value="{{ request.args.get('min','') }}" placeholder="e.g. 50000" inputmode="decimal"></label>
+      <label class="fld fld-amt"><span>to</span><input type="text" name="max" value="{{ request.args.get('max','') }}" placeholder="e.g. 2L" inputmode="decimal"></label>
+      <div class="fld-actions">
+        <button type="submit" class="btn-primary"><svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>Apply</button>
+        {% if uf.q or uf.party or not uf.only_marked or request.args.get('min') or request.args.get('max') %}<a class="btn" href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab=anomaly#dashboard">Clear</a>{% endif %}
+      </div>
+    </form>
+    <div class="table-tools">
+      <p class="note">{% if unusual_total == 0 %}No invoices match these filters.{% elif unusual_total > unusual_list|length %}Showing the first {{ unusual_list|length }} of <strong>{{ unusual_total }}</strong>.{% else %}<strong>{{ unusual_total }}</strong> invoices.{% endif %} Score runs from 0 (typical) to 1 (most unusual). Click a row for the full record.</p>
+      <div class="exports">
+        <a class="btn" href="/export/unusual.xlsx?{{ qs() }}"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>Excel</a>
+        <a class="btn" href="/export/unusual.csv?{{ qs() }}"><svg class="ico" aria-hidden="true"><use href="#i-download"/></svg>CSV</a>
+      </div>
+    </div>
+    {% if unusual_list %}
+    <div class="scroll"><table class="records">
+      <thead><tr>
+        {{ sorth(uf, 'invoice', 'Invoice', 'nowrap') }}{{ sorth(uf, 'party', 'Party') }}{{ sorth(uf, 'date', 'Date', 'nowrap') }}
+        {{ sorth(uf, 'amount', 'Amount', 'num') }}{{ sorth(uf, 'score', 'Score', 'num') }}<th>Why it looks unusual</th><th>Also flagged for</th>
+      </tr></thead>
+      <tbody>{% for r in unusual_list %}<tr class="rec" data-rec="{{ r.id }}" tabindex="0" aria-label="Open {{ r.id }}">
+        <td class="nowrap"><span class="rec-id">{{ r.id }}</span></td><td>{{ r.party }}</td><td class="nowrap">{{ r.date }}</td>
+        <td class="num">{{ r.amount }}</td><td class="num stake">{{ r.score }}</td><td class="why">{{ r.why }}</td><td>{{ r.also }}</td>
+      </tr>{% endfor %}</tbody>
     </table></div>
-    <p class="note">Score runs from 0 (typical) to 1 (most unusual). "Std. dev." measures how far an amount is from that party's average invoice.</p>
+    {% endif %}
     <script>Plotly.newPlot('hist', {{ hist.data|tojson }}, {{ hist.layout|tojson }}, {displayModeBar:false, responsive:true});
             Plotly.newPlot('scat', {{ scat.data|tojson }}, {{ scat.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
 
@@ -734,16 +447,29 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     </div>
 
   {% elif active == 'query' %}
-    <div class="ask-wrap">
-      <h2>Have a question?</h2>
-      <p>Ask anything about the project — how it works, the tech, or the numbers.</p>
-      <form class="ask-form" id="askForm">
+    <section class="ask" aria-labelledby="askTitle">
+      <div class="ask-head">
+        <div>
+          <h2 id="askTitle">Ask the Ledger</h2>
+          <p>Ask about this run: mismatches, flagged invoices, GST errors, why a record was flagged, what to fix before filing. Answers come only from the loaded data; if the data can't answer, it says so.</p>
+        </div>
+        <span class="ai-badge {{ 'on' if ai_on else 'off' }}">{% if ai_on %}AI on · Claude{% else %}AI off · suggested questions answered from the data{% endif %}</span>
+      </div>
+      <div class="chips" aria-label="Suggested questions">
+        {% for sq in suggest %}<button type="button" class="chip" data-ask="{{ sq }}">{{ sq }}</button>{% endfor %}
+      </div>
+      <div class="ask-log" id="askLog" aria-live="polite"></div>
+      <form class="ask-bar" id="askForm">
         <label class="sr-only" for="askText">Your question</label>
-        <textarea id="askText" placeholder="Type your question here…" required></textarea>
-        <button type="submit">Ask on GitHub <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></button>
+        <input type="text" id="askText" placeholder="e.g. Which purchase invoices risk ITC this period?" autocomplete="off" maxlength="1000" required>
+        <button type="submit" class="btn-primary"><svg class="ico" aria-hidden="true"><use href="#i-send"/></svg>Ask</button>
       </form>
-      <p class="note">Your question opens as a new issue on the project's GitHub repo, where you can review it before posting.</p>
-    </div>
+      <div class="recent" id="recentWrap" hidden>
+        <div class="recent-head"><h3>Your recent questions</h3><button type="button" class="link-btn" id="clearRecent">Clear</button></div>
+        <div class="chips" id="recentList"></div>
+      </div>
+      {% if not ai_on %}<p class="note">To ask anything else, add <code>ANTHROPIC_API_KEY=…</code> to a <code>.env</code> file next to <code>app.py</code> and restart.</p>{% endif %}
+    </section>
   {% endif %}
   <script>window.__alignGrid && window.__alignGrid();</script>
   <div id="tab-panel-end"></div>
@@ -760,20 +486,30 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     <nav class="footer-nav" aria-label="Footer">
       <a href="#dashboard">Dashboard</a>
       <a href="?tab=accuracy#dashboard">Accuracy</a>
-      <a href="?tab=query#dashboard">Query</a>
+      <a href="?tab=query#dashboard">Ask the Ledger</a>
     </nav>
   </div>
 </footer>
 </div>
+{% endif %}
 </div>
 
 </div>
+
+<dialog class="rec-dialog" id="recDialog" aria-labelledby="recTitle">
+  <div class="rec-head">
+    <div><div class="rec-kicker">Record detail</div><h2 id="recTitle">Record</h2></div>
+    <button type="button" class="close-x" id="recClose" aria-label="Close"><svg class="ico" aria-hidden="true"><use href="#i-close"/></svg></button>
+  </div>
+  <div id="recBody" class="rec-body"></div>
+</dialog>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" onerror="document.documentElement.classList.remove('motion')"></script>
 <script>
 /* Theme toggle */
 (function () {
   var root = document.documentElement, btn = document.getElementById('themeBtn');
+  if (!btn) return;
   function label() { btn.setAttribute('aria-label', root.getAttribute('data-theme') === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'); }
   label();
   btn.addEventListener('click', function () {
@@ -784,15 +520,134 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   });
 })();
 
-/* Ask: open a prefilled GitHub issue (reviewed by the asker before posting). Delegated: the form arrives with the Query tab. */
-document.addEventListener('submit', function (e) {
-  if (!e.target || e.target.id !== 'askForm') return;
-  e.preventDefault();
-  var q = document.getElementById('askText').value.trim();
-  if (!q) return;
-  window.open('https://github.com/Anandtripathiii/tax_recon/issues/new?title=' +
-    encodeURIComponent('Question: ' + q.slice(0, 70)) + '&body=' + encodeURIComponent(q), '_blank', 'noopener');
-});
+/* Record detail panel, copy-to-clipboard and Ask the Ledger. All delegated: tab content arrives later. */
+(function () {
+  var dlg = document.getElementById('recDialog'), body = document.getElementById('recBody'), title = document.getElementById('recTitle');
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]; }); }
+  function runQS() {
+    var f = document.getElementById('paramForm'), q = new URLSearchParams();
+    ['n', 'rate', 'seed'].forEach(function (k) { if (f && f.elements[k]) q.set(k, f.elements[k].defaultValue); });
+    return q;
+  }
+  function source(name, rec, hl, missingText) {
+    if (!rec) return '<section class="src missing"><h3>' + esc(name) + '</h3><p>' + esc(missingText) + '</p></section>';
+    var rows = Object.keys(rec).map(function (k) {
+      var on = hl.indexOf(k) > -1;
+      return '<dt>' + esc(k) + '</dt><dd' + (on ? ' class="hl"' : '') + '>' + esc(rec[k]) + (on ? '<span class="hl-tag">Disagrees</span>' : '') + '</dd>';
+    }).join('');
+    return '<section class="src"><h3>' + esc(name) + '</h3><dl>' + rows + '</dl></section>';
+  }
+  function render(d) {
+    title.textContent = d.title;
+    var flags = d.flags.length ? d.flags.map(function (f) {
+      return '<div class="rec-flag"><b>' + esc(f.problem) + '</b><span>' + esc(f.why) + '</span>' +
+        '<span class="ef">Expected ' + esc(f.expected) + ' · found <span class="found">' + esc(f.found) + '</span>' + (f.stake ? ' · <strong>' + esc(f.stake) + '</strong> at stake' : '') + '</span>' +
+        '<span class="act">Next step: ' + esc(f.action) + '</span></div>';
+    }).join('') : '<div class="rec-flag ok"><b>No flags</b><span>This record matched its bank payment and ledger entry.</span></div>';
+    var extra = [];
+    if (d.original) extra.push('Possible original: ' + esc(d.original) + '.');
+    if (d.anomaly_score != null) extra.push('ML unusualness score ' + esc(d.anomaly_score) + (d.marked_unusual ? ' (marked unusual)' : '') + '.');
+    body.innerHTML = '<div class="rec-flags">' + flags + '</div><div class="rec-cols">' +
+      source('Invoice', d.invoice, d.hl.invoice, 'No invoice for this payment in the books.') +
+      source('Bank payment', d.bank, d.hl.bank, 'No bank payment found for this invoice.') +
+      source('Ledger entry', d.ledger, d.hl.ledger, 'No ledger entry found for this invoice.') + '</div>' +
+      (extra.length ? '<p class="note">' + extra.join(' ') + '</p>' : '');
+  }
+  function openRecord(id, opener) {
+    if (!dlg) return;
+    title.textContent = id; body.innerHTML = '<p class="note">Loading ' + esc(id) + '…</p>';
+    dlg._opener = opener || document.activeElement;
+    if (!dlg.open) dlg.showModal();
+    fetch('/record/' + encodeURIComponent(id) + '?' + runQS().toString())
+      .then(function (r) { return r.json(); })
+      .then(function (d) { if (d.error) { body.innerHTML = '<p class="note">' + esc(d.error) + '</p>'; return; } render(d); })
+      .catch(function () { body.innerHTML = '<p class="note">Could not load this record. Try again.</p>'; });
+  }
+  window.__openRecord = openRecord;
+  if (dlg) {
+    document.getElementById('recClose').addEventListener('click', function () { dlg.close(); });
+    dlg.addEventListener('click', function (e) { if (e.target === dlg) dlg.close(); });
+    dlg.addEventListener('close', function () { if (dlg._opener && dlg._opener.focus) dlg._opener.focus(); });
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('tr.rec, .rec-link');
+    if (t) { e.preventDefault(); openRecord(t.dataset.rec, t); return; }
+    var c = e.target.closest && e.target.closest('[data-copy]');
+    if (c) {
+      var ta = document.getElementById(c.dataset.copy), label = c.querySelector('span');
+      var done = function (ok) { if (label) { var was = label.textContent; label.textContent = ok ? 'Copied' : 'Select and copy'; setTimeout(function () { label.textContent = was; }, 1800); } };
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(ta.value).then(function () { done(true); }, function () { ta.classList.remove('sr-only'); ta.select(); done(false); });
+      else { ta.classList.remove('sr-only'); ta.select(); done(document.execCommand && document.execCommand('copy')); }
+    }
+  });
+  document.addEventListener('keydown', function (e) {
+    var t = e.target.closest && e.target.closest('tr.rec');
+    if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); openRecord(t.dataset.rec, t); }
+  });
+
+  /* ---- Ask the Ledger ---- */
+  var RECENT = 'askRecent';
+  function recent() { try { return JSON.parse(localStorage.getItem(RECENT) || '[]'); } catch (e) { return []; } }
+  function saveRecent(q) {
+    var list = recent().filter(function (x) { return x.toLowerCase() !== q.toLowerCase(); });
+    list.unshift(q); list = list.slice(0, 8);
+    try { localStorage.setItem(RECENT, JSON.stringify(list)); } catch (e) {}
+    renderRecent();
+  }
+  function renderRecent() {
+    var wrap = document.getElementById('recentWrap'), box = document.getElementById('recentList');
+    if (!wrap || !box) return;
+    var list = recent();
+    wrap.hidden = !list.length;
+    box.innerHTML = list.map(function (q) { return '<button type="button" class="chip" data-ask="' + esc(q) + '">' + esc(q) + '</button>'; }).join('');
+  }
+  window.__initAsk = renderRecent;
+  function format(text) {
+    var ids = /\b(INV-\d{3,5}(?:-R)?|T\d{6})\b/g;
+    var inline = function (s) {
+      return esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(ids, function (m) { return '<button type="button" class="rec-link" data-rec="' + m + '">' + m + '</button>'; });
+    };
+    var out = [], list = [];
+    text.split(/\n/).forEach(function (line) {
+      var m = line.match(/^\s*[-*•]\s+(.*)$/);
+      if (m) { list.push('<li>' + inline(m[1]) + '</li>'); return; }
+      if (list.length) { out.push('<ul>' + list.join('') + '</ul>'); list = []; }
+      if (line.trim()) out.push('<p>' + inline(line) + '</p>');
+    });
+    if (list.length) out.push('<ul>' + list.join('') + '</ul>');
+    return out.join('');
+  }
+  function ask(q) {
+    var log = document.getElementById('askLog'); if (!log || !q) return;
+    var qa = document.createElement('div'); qa.className = 'turn-q'; qa.textContent = q;
+    var an = document.createElement('div'); an.className = 'turn-a pending'; an.textContent = 'Checking the ledger…';
+    log.appendChild(qa); log.appendChild(an);
+    an.scrollIntoView({ block: 'nearest' });
+    saveRecent(q);
+    var p = runQS(), body = { question: q, n: +p.get('n'), rate: +p.get('rate'), seed: +p.get('seed') };
+    fetch('/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (d) {
+        an.classList.remove('pending');
+        var who = d.mode === 'ai' ? 'Answered by Claude from this run' : d.mode === 'off' ? 'AI assistant is off' : 'Answered directly from this run (no AI)';
+        an.innerHTML = format(d.answer || '') + '<div class="meta">' + esc(who) + (d.used && d.used.length ? ' · checked: ' + esc(d.used.filter(function (x, i, a) { return a.indexOf(x) === i; }).join(', ')) : '') + (d.note ? '<br>' + esc(d.note) : '') + '</div>';
+      })
+      .catch(function () { an.classList.remove('pending'); an.textContent = 'Could not reach the server. Check that the app is running and try again.'; });
+  }
+  document.addEventListener('submit', function (e) {
+    if (!e.target || e.target.id !== 'askForm') return;
+    e.preventDefault();
+    var inp = document.getElementById('askText'), q = inp.value.trim();
+    if (q) { ask(q); inp.value = ''; inp.focus(); }
+  });
+  document.addEventListener('click', function (e) {
+    var c = e.target.closest && e.target.closest('[data-ask]');
+    if (c) { ask(c.dataset.ask); return; }
+    if (e.target.id === 'clearRecent') { try { localStorage.removeItem(RECENT); } catch (er) {} renderRecent(); }
+  });
+  renderRecent();
+})();
 
 /* Tabs load in place and slide by tab order. Content itself never animates in; the only other motion is
    the dashboard deck sliding up over the pinned home section. */
@@ -866,6 +721,7 @@ document.addEventListener('submit', function (e) {
     }
     runScripts(panel);
     applyExample();
+    if (window.__initAsk) window.__initAsk();
   }
 
   /* Fallback slide for browsers without View Transitions: a snapshot copy of the old content slides out while the new slides in. */
@@ -998,5 +854,6 @@ document.addEventListener('submit', function (e) {
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(settle);
 })();
 </script>
+<script src="{{ asset('nav.js') }}"></script>
 </body>
 </html>
