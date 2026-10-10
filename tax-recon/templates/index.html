@@ -72,16 +72,33 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
 ::selection { background: var(--blue); color: #fff; }
 .wrap { display: flex; flex-direction: column; min-height: 100vh; overflow-x: clip; }
 
-/* Home and deck: the home section pins while the dashboard deck slides up over it (GSAP ScrollTrigger). */
+/* Three stacked sheets: home (locked) -> Live Proof sheet slides over it (then locks) -> Ledger app screen slides over that.
+   Each sheet is opaque graph paper with a hard ink edge on top. */
 .home { position: relative; z-index: 0; }
 .deck { position: relative; z-index: 2; background-color: var(--bg); background-image: var(--paper-grid);
-  background-size: 60px 60px; background-position: var(--gx, 0) var(--gy, 0); box-shadow: var(--cover-shadow); }
+  background-size: 60px 60px; box-shadow: var(--cover-shadow); }
+.app { position: relative; z-index: 3; display: flex; flex-direction: column; background-color: var(--bg);
+  box-shadow: var(--cover-shadow); }
+.app-tabs { width: 100%; max-width: 1300px; margin: 0 auto; padding: clamp(.8rem, 2vw, 1.4rem) clamp(1rem, 2.5vw, 2rem) 0; flex: none; }
+.app-tabs .tabs { margin: 0; }
+.app-body { background-color: var(--bg); background-image: var(--paper-grid); background-size: 60px 60px;
+  background-attachment: local; scrollbar-color: var(--ink) transparent; }
+/* App screen: on screens with room for it, the Ledger sheet is exactly one screen tall and is the end of the page.
+   Header and tab bar stay put; only the tab content scrolls, and only once the sheet has reached the top. */
+@media (min-width: 700px) and (min-height: 600px) {
+  .app { height: 100vh; height: 100svh; }
+  .app-body { flex: 1; min-height: 0; overflow-y: hidden; }
+  .app.locked .app-body { overflow-y: auto; }
+  /* One scroller only: long tables run full length inside the content area, with their header row stuck to its top. */
+  .app-body .scroll { max-height: none; overflow: visible; }
+  .app-body .scroll th { top: 0; }
+}
 
 /* Tab changes load in place (no page reload) and slide sideways by tab order: a tab to the right comes in
    from the right and pushes the old content out left; a tab to the left does the reverse. Tab bar stays put. */
 :root { --ease-slide: cubic-bezier(0.32, 0.72, 0, 1); --dur-slide: .35s; }
-.tab-panel { view-transition-name: tab-panel; min-height: 80vh; background-color: var(--bg);
-  background-image: var(--paper-grid); background-size: 60px 60px; background-position: var(--gx, 0) var(--gy, 0); }
+/* The slide moves the scrolling content area only; header and tab bar sit outside it. */
+.app-body { view-transition-name: tab-panel; }
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
 ::view-transition-group(tab-panel) { animation: none; }
 ::view-transition-old(tab-panel) { animation: slide-out-left var(--dur-slide) var(--ease-slide) both; }
@@ -498,7 +515,9 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     </div>
   </div>
 </section>
+</div>
 
+<div class="app" id="app">
 <header class="topbar" id="dashboard">
   <div class="row">
     <div class="brand">
@@ -524,14 +543,17 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   </div>
 </header>
 
-<main>
+<div class="app-tabs">
   <nav class="tabs" aria-label="Dashboard sections">
     {% set tabs = [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy'),('verify','Verification'),('query','Query')] %}
     {% for t, lbl in tabs %}
       <a href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab={{t}}{% if t=='flagged' and q %}&q={{q}}{% endif %}{% if t=='flagged' and kind!='All' %}&kind={{kind}}{% endif %}#dashboard" class="{% if active==t %}active{% endif %}"{% if active==t %} aria-current="page"{% endif %}>{{ lbl }}</a>
     {% endfor %}
   </nav>
+</div>
 
+<div class="app-body" id="appBody">
+<main>
   <div class="tab-panel" id="tabPanel">
   {% if active == 'summary' %}
     <div class="restore-strip" id="restoreStrip" hidden><span>Example hidden.</span> <button type="button" class="link-btn" id="showExample">Show example</button></div>
@@ -743,6 +765,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   </div>
 </footer>
 </div>
+</div>
 
 </div>
 
@@ -876,7 +899,8 @@ document.addEventListener('submit', function (e) {
         var doc = new DOMParser().parseFromString(html, 'text/html');
         if (!doc.getElementById('tabPanel')) throw new Error('no panel');
         if (opts.push) history.pushState({ tab: tabOf(u.href) }, '', u.pathname + u.search + (u.hash || '#dashboard'));
-        var update = function () { swap(doc); window.scrollTo(0, keepY); align(); };
+        var body = document.getElementById('appBody');
+        var update = function () { swap(doc); if (body) body.scrollTop = 0; window.scrollTo(0, keepY); align(); };
         var animate = dir && !reduce;
         var done = function () {
           root.removeAttribute('data-slide');
@@ -936,7 +960,31 @@ document.addEventListener('submit', function (e) {
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(align);
   applyExample();
 
-  if (!hasGsap || reduce) return;
+  /* The Ledger app screen unlocks its inner scroll only once it sits at the top of the screen; until then the wheel
+     moves the page (so the sheet slides up). At the top of the content, scrolling up hands back to the page. */
+  var app = document.getElementById('app');
+  var roomy = window.matchMedia('(min-width: 700px) and (min-height: 600px)');
+  var lockState = function () {
+    if (!app) return;
+    app.classList.toggle('locked', roomy.matches && app.getBoundingClientRect().top <= 1);
+  };
+  /* A link to #dashboard (or a reload of a tab) lands on the Ledger app screen. Done once the layout is final, because
+     the home lock adds space above it after the browser's own jump to the anchor. */
+  var userMoved = false;
+  ['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(function (ev) {
+    window.addEventListener(ev, function () { userMoved = true; }, { once: true, passive: true });
+  });
+  var toDashboard = function () {
+    if (location.hash !== '#dashboard' || !app || userMoved) return;
+    window.scrollTo({ top: app.getBoundingClientRect().top + window.scrollY, behavior: 'instant' });
+    lockState();
+  };
+  window.addEventListener('scroll', lockState, { passive: true });
+  window.addEventListener('resize', lockState);
+  window.addEventListener('load', lockState);
+  lockState();
+
+  if (!hasGsap || reduce) { toDashboard(); window.addEventListener('load', toDashboard); return; }
   gsap.registerPlugin(ScrollTrigger);
 
   /* Home is locked for the first 4 wheel ticks (HOLD px of scroll), then the deck slides up over it.
@@ -951,8 +999,19 @@ document.addEventListener('submit', function (e) {
       pin: true, pinSpacing: false, invalidateOnRefresh: true
     });
   }
+  /* The Live Proof sheet locks once it is fully on screen (its bottom at the screen's bottom, or its top at the top if it
+     is shorter than the screen), and the Ledger app screen slides up over it. */
+  if (deck && app) {
+    ScrollTrigger.create({
+      trigger: deck, endTrigger: app,
+      start: function () { return deck.offsetHeight > window.innerHeight ? 'bottom bottom' : 'top top'; },
+      end: 'top top', pin: true, pinSpacing: false, invalidateOnRefresh: true,
+      onRefresh: lockState
+    });
+  }
   fillRings(0);
-  var refresh = function () { align(); ScrollTrigger.refresh(); };
+  toDashboard();
+  var refresh = function () { align(); ScrollTrigger.refresh(); toDashboard(); };
   window.addEventListener('load', refresh);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
 })();
