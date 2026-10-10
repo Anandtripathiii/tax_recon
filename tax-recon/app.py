@@ -16,7 +16,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 from flask import Flask, Response, abort, render_template, request, send_file
 
-from engine import LEDGER_LATE_DAYS, PAY_LATE_DAYS, evaluate, run_all, to_excel
+from engine import LEDGER_LATE_DAYS, PAY_LATE_DAYS, SLABS, TAX_TOLERANCE, evaluate, run_all, to_excel
 from generator import make_data
 
 # Audit Ledger chart palette: brand blue first, then a CVD-validated categorical order.
@@ -140,6 +140,64 @@ def live_proof(res, ev, elapsed):
             "gst_precision": f"{g.precision.iloc[0] * 100:.0f}%" if len(g) else "—",
             "gst_recall": f"{g.recall.iloc[0] * 100:.0f}%" if len(g) else "—",
             "ml_precision": f"{ml.precision.iloc[0] * 100:.0f}%" if len(ml) else "—"}
+
+
+MATERIALITY = 98.0   # a check passes when at least this share of records is clean
+
+
+def verification(res, ev):
+    """Verify the whole reconciliation from the run's own data. Every figure is computed here."""
+    inv, bank, flags = res["inv"], res["bank"], res["flags"]
+    ok = ~inv.dup
+    n_ok, n_all = int(ok.sum()), len(inv)
+    checks = []
+
+    def add(key, title, clean, total, detail):
+        score = 100.0 * clean / total if total else 100.0
+        checks.append({"key": key, "title": title, "score": score, "clean": clean, "total": total,
+                       "passed": score >= MATERIALITY, "detail": detail})
+
+    paid = int((ok & inv.txn_id.notna()).sum())
+    add("matched", "All invoices matched to payments", paid, n_ok,
+        f"{paid:,} of {n_ok:,} invoices have a bank payment. "
+        f"The other {n_ok - paid:,} are flagged as Missing payment.")
+
+    has_led = ok & inv.entry_id.notna()
+    ties = has_led & ((inv.led_amount - inv.total).abs() <= 1)
+    gap = (inv.led_amount - inv.total)[has_led].sum()
+    add("ledger", "Ledger totals tie out", int(ties.sum()), int(has_led.sum()),
+        f"{int(ties.sum()):,} of {int(has_led.sum()):,} ledger entries equal their invoice (±₹1). "
+        f"Ledger {rs(inv.led_amount[has_led].sum())} vs invoices {rs(inv.total[has_led].sum())}, "
+        f"difference {rs(abs(gap))}.")
+
+    # Recomputed here, independently of the engine: taxable value x GST rate.
+    recomputed = (inv.taxable_value * inv.gst_rate / 100).round(2)
+    right = ok & inv.gst_rate.isin(SLABS) & ((inv.tax_amount - recomputed).abs() <= TAX_TOLERANCE)
+    wrong = ok & ~right
+    engine_agrees = set(inv.row_id[wrong]) == set(flags.key[flags.error_type == "wrong_gst"])
+    add("gst", "GST recomputed correctly", int(right.sum()), n_ok,
+        f"{int(right.sum()):,} of {n_ok:,} invoices charge the right GST. "
+        f"Tax gap on the other {int(wrong.sum()):,}: {rs((inv.tax_amount - recomputed)[wrong].abs().sum())}. "
+        + ("The engine flagged exactly these." if engine_agrees else "The engine's flags differ from this recount."))
+
+    dups = int(inv.dup.sum())
+    add("dups", "No duplicate records", n_all - dups, n_all,
+        f"{dups:,} duplicate copies among {n_all:,} invoices, each flagged as Duplicate invoice.")
+
+    explained = int(flags.detail.fillna("").str.strip().ne("").sum())
+    add("explained", "Every flag has an explanation", explained, len(flags),
+        f"{explained:,} of {len(flags):,} flags carry a written reason.")
+
+    rules = ev[ev.error_type != "anomalous_amount"]
+    correct, flagged = int(rules.correct.sum()), int(rules.flagged.sum())
+    add("answers", "Flags confirmed by the answer key", correct, flagged,
+        f"{correct:,} of {flagged:,} rule-based flags are real planted errors. "
+        "The ML review queue is left out; see Unusual records.")
+
+    overall = sum(c["score"] for c in checks) / len(checks)
+    passed = sum(c["passed"] for c in checks)
+    return {"checks": checks, "score": overall, "passed": passed, "count": len(checks),
+            "all_pass": passed == len(checks), "materiality": MATERIALITY}
 
 
 def pick_example(res, truth):
@@ -350,6 +408,7 @@ def index():
     kinds = ["All"] + sorted(set(flags.error_type.map(LABELS).dropna()))
     fuzzy_count = int((inv.match == "fuzzy").sum())
     example = pick_example(res, truth)
+    verify = verification(res, ev) if active == "verify" else None
 
     return render_template(
         "index.html", n=n, rate=int(rate * 100), seed=seed,
@@ -357,7 +416,7 @@ def index():
         kinds=kinds, kind=kind, q=q,
         tax_kpis=tax_kpis, gst=gst, monthly=monthly, hist=hist, scat=scat, anomaly_tbl=anomaly_tbl,
         accuracy=accuracy, acc_tbl=acc_tbl, cmp_rows=cmp_rows, fuzzy_count=fuzzy_count,
-        proof=proof, example=example, active=active)
+        proof=proof, example=example, verify=verify, active=active)
 
 
 @app.route("/download/<kind>")
