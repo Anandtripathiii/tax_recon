@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-10T19:43:47+00:00",
+  "generatedAt": "2026-10-10T19:57:46+00:00",
   "title": "Design System: Tax Reconciliation",
   "extensions": {
     "colorMeta": {
@@ -490,7 +490,12 @@
       },
       {
         "name": "The Cover Rule",
-        "body": "Movement means one sheet laid over another, nothing else. The home section pins once its bottom reaches the screen's bottom, and the dashboard deck slides up over it: an opaque graph-paper sheet with a hard 6px ink edge on top and soft depth behind (GSAP ScrollTrigger, pin with pinSpacing off). Every tab change does the same: the new tab content slides up over the old one (0.35s, cubic-bezier(0.32, 0.72, 0, 1)), identical in every direction, with the header, controls and tab bar still. Cross-document View Transitions where supported, GSAP otherwise; off under reduced motion.",
+        "body": "The home section pins once its bottom reaches the screen's bottom, and the dashboard deck slides up over it: an opaque graph-paper sheet with a hard 6px ink edge on top and soft depth behind (GSAP ScrollTrigger, pin with pinSpacing off).",
+        "section": "elevation"
+      },
+      {
+        "name": "The Tab Slide Rule",
+        "body": "Tabs load in place, with no page reload and no scroll change, and slide by tab order: a tab to the right enters from the right and pushes the old content out left; a tab to the left does the reverse (0.35s, cubic-bezier(0.32, 0.72, 0, 1)). Only the content area moves; the header, Run controls and tab bar stay still. Same-document View Transitions, with a GSAP fallback; no animation under reduced motion. Run still reloads the page, because every figure changes, and returns you to the same scroll position.",
         "section": "elevation"
       },
       {

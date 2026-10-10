@@ -199,7 +199,9 @@ Depth is flat-graphic, not atmospheric. Surfaces don't float on blurred shadows.
 
 **The Exhibit Rule.** A blue offset shadow belongs to exactly one featured piece of evidence per view. Everything else casts ink.
 
-**The Cover Rule.** Movement means one sheet laid over another, nothing else. The home section pins once its bottom reaches the screen's bottom, and the dashboard deck slides up over it: an opaque graph-paper sheet with a hard 6px ink edge on top and soft depth behind (GSAP ScrollTrigger, pin with pinSpacing off). Every tab change does the same: the new tab content slides up over the old one (0.35s, cubic-bezier(0.32, 0.72, 0, 1)), identical in every direction, with the header, controls and tab bar still. Cross-document View Transitions where supported, GSAP otherwise; off under reduced motion.
+**The Cover Rule.** The home section pins once its bottom reaches the screen's bottom, and the dashboard deck slides up over it: an opaque graph-paper sheet with a hard 6px ink edge on top and soft depth behind (GSAP ScrollTrigger, pin with pinSpacing off).
+
+**The Tab Slide Rule.** Tabs load in place, with no page reload and no scroll change, and slide by tab order: a tab to the right enters from the right and pushes the old content out left; a tab to the left does the reverse (0.35s, cubic-bezier(0.32, 0.72, 0, 1)). Only the content area moves; the header, Run controls and tab bar stay still. Same-document View Transitions, with a GSAP fallback; no animation under reduced motion. Run still reloads the page, because every figure changes, and returns you to the same scroll position.
 
 **The Still Content Rule.** Text, cards, tables and numbers appear as they are, with no fade or slide-in. The only fill animation is the Verification ring stroke; its score never counts.
 
