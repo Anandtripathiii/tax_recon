@@ -3,16 +3,51 @@
 <head>
 <meta charset="utf-8">
 <title>Tax Reconciliation</title>
+<link rel="expect" href="#tab-panel-end" blocking="render">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>
 /* Set the saved theme and the motion flag before first paint: no theme flash, no content flash. */
 (function () {
   var root = document.documentElement;
   try { root.setAttribute('data-theme', localStorage.getItem('theme') || 'light'); } catch (e) {}
-  if (window.matchMedia && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (!reduce) {
     root.classList.add('motion');
     setTimeout(function () { if (!window.gsap) root.classList.remove('motion'); }, 2500);
   }
+
+  /* Page transitions. Cross-document View Transitions where supported; GSAP fallback otherwise. */
+  var vt = !!(window.CSS && CSS.supports && CSS.supports('selector(:active-view-transition-type(x))'));
+  var act = window.navigation && navigation.activation;
+  /* Tab order decides direction: a tab to the right slides in from the right, one to the left from the left.
+     Same tab (Run, Search): history decides, with back sliding in from the left. */
+  var ORDER = ['summary', 'flagged', 'tax', 'anomaly', 'accuracy', 'verify', 'query'];
+  function tabOf(u) { try { return ORDER.indexOf(new URL(u, location.href).searchParams.get('tab') || 'summary'); } catch (e) { return -1; } }
+  function isBack(a) { return !!(a && a.navigationType === 'traverse' && a.from && a.entry && a.entry.index < a.from.index); }
+  function dirFor(fromUrl, toUrl, back) {
+    var a = tabOf(fromUrl), b = tabOf(toUrl);
+    if (a > -1 && b > -1 && a !== b) return b > a ? 'forward' : 'back';
+    return back ? 'back' : 'forward';
+  }
+  var dir = null, here = location.href;
+  if (!reduce) {
+    if (vt) {
+      if (act && act.from && act.from.url && act.navigationType !== 'reload') dir = dirFor(act.from.url, here, isBack(act));
+    } else {
+      var navEntry = performance.getEntriesByType && performance.getEntriesByType('navigation')[0], prev = null;
+      try { prev = sessionStorage.getItem('lastTab'); dir = sessionStorage.getItem('slide'); sessionStorage.removeItem('slide'); } catch (e) {}
+      if (!dir && navEntry && navEntry.type === 'back_forward') dir = prev ? dirFor('?tab=' + prev, here, true) : 'back';
+    }
+  }
+  try { sessionStorage.setItem('lastTab', new URL(here).searchParams.get('tab') || 'summary'); } catch (e) {}
+  window.__slide = { vt: vt, dir: dir, reduce: reduce, dirFor: dirFor, tabOf: tabOf };
+  /* An arriving page shows its tab content straight away; the slide is the motion. */
+  if (dir) root.classList.add('slide-nav');
+  if (vt) window.addEventListener('pagereveal', function (e) {
+    if (!e.viewTransition) return;
+    var a = window.navigation && navigation.activation;
+    e.viewTransition.types.add(a && a.from && a.from.url ? dirFor(a.from.url, location.href, isBack(a)) : 'forward');
+  });
 })();
 </script>
 <link rel="icon" href="/favicon.ico" type="image/svg+xml">
@@ -30,6 +65,7 @@
   /* Surfaces that stay ink in both themes (verdict bar, footer). */
   --fixed-ink: #0a0a0f; --fixed-paper: #eef1f7; --fixed-link: #5b74ff;
   --wash: rgba(45,75,255,0.06);
+  --fail: #c8321f;   /* status only: a failed check, always with an icon and the word "Fail" */
 }
 [data-theme="dark"] {
   --bg: #0a0a10; --bg-2: #15151e; --card: #1b1b26;
@@ -38,6 +74,7 @@
   --rule: #2a2a38; --accent: #5b74ff;
   --chart-tint: #ffffff; --chart-border: #2a2a38;
   --wash: rgba(91,116,255,0.12);
+  --fail: #ff6b57;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -62,6 +99,24 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
 /* Motion: content is hidden only while GSAP is about to reveal it. */
 html.motion [data-reveal], html.motion .hero-title .line > span,
 html.motion .hero-desc, html.motion .hero-cta-row { visibility: hidden; }
+
+/* Page transitions: only the tab panel slides; header, controls and tabs stay put. */
+:root { --ease-slide: cubic-bezier(0.32, 0.72, 0, 1); --dur-slide: .35s; }
+@view-transition { navigation: auto; }
+@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+.tab-panel { view-transition-name: tab-panel; }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; }
+/* No position or size morph: the panel only ever moves sideways, even if the two pages sit at different scroll positions. */
+::view-transition-group(tab-panel) { animation: none; }
+::view-transition-old(tab-panel) { animation: slide-out-left var(--dur-slide) var(--ease-slide) both; }
+::view-transition-new(tab-panel) { animation: slide-in-right var(--dur-slide) var(--ease-slide) both; }
+html:active-view-transition-type(back)::view-transition-old(tab-panel) { animation-name: slide-out-right; }
+html:active-view-transition-type(back)::view-transition-new(tab-panel) { animation-name: slide-in-left; }
+@keyframes slide-out-left { to { transform: translateX(-100vw); } }
+@keyframes slide-out-right { to { transform: translateX(100vw); } }
+@keyframes slide-in-right { from { transform: translateX(100vw); } }
+@keyframes slide-in-left { from { transform: translateX(-100vw); } }
+html.motion.slide-nav .tab-panel [data-reveal] { visibility: visible; }
 
 /* Focus: blue ring, offset off the ink edge. */
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
@@ -238,6 +293,40 @@ td.why { color: var(--ink-soft); min-width: 18rem; }
 .cmp tr.changed .delta { color: var(--blue); }
 .cmp tr.changed td:first-child { font-weight: 700; }
 
+/* Verification rings */
+.verify-hero { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 2rem; align-items: center;
+  background: var(--card); border: 2px solid var(--ink); box-shadow: 6px 6px 0 var(--blue); padding: 1.6rem 2rem; margin-bottom: 1.8rem; }
+.verify-hero h2 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-transform: uppercase;
+  font-size: 1.6rem; letter-spacing: -0.01em; line-height: 1.1; margin: 0 0 .5rem; }
+.verify-hero p { margin: 0 0 .4rem; color: var(--ink-soft); max-width: 60ch; }
+.verify-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; }
+.check { background: var(--card); border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+  padding: 1.3rem 1.2rem 1.2rem; display: grid; justify-items: center; text-align: center; gap: .55rem; min-width: 0; }
+.check h3 { font-family: 'Space Grotesk', sans-serif; font-weight: 700; text-transform: uppercase; font-size: .95rem;
+  letter-spacing: .01em; line-height: 1.2; margin: .2rem 0 0; text-wrap: balance; }
+.check .detail { font-size: .82rem; color: var(--muted); margin: 0; text-wrap: pretty; }
+.ring { position: relative; display: grid; place-items: center; width: 148px; aspect-ratio: 1; max-width: 100%; }
+.ring.big { width: 200px; }
+.ring svg { width: 100%; height: 100%; transform: rotate(-90deg); overflow: visible; }
+.ring .track { fill: none; stroke: var(--rule); }
+.ring .fill { fill: none; stroke: var(--blue); stroke-linecap: butt; }
+.ring.fail .fill { stroke: var(--fail); }
+.ring .score { position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.ring .score b { font-size: 1.9rem; letter-spacing: -0.02em; }
+.ring.big .score b { font-size: 2.8rem; }
+.ring .score small { font-size: .68rem; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-top: .35rem; }
+.verdict-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .6rem; border: 2px solid var(--ink);
+  font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: .75rem; letter-spacing: 1px; text-transform: uppercase; }
+.verdict-chip.pass { background: var(--blue); border-color: var(--blue); color: #fff; }
+.verdict-chip.fail { background: var(--card); border-color: var(--fail); color: var(--fail); }
+.verdict-chip .ico { width: 14px; height: 14px; }
+@media (max-width: 900px) { .verify-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) {
+  .verify-grid { grid-template-columns: minmax(0, 1fr); }
+  .verify-hero { grid-template-columns: minmax(0, 1fr); justify-items: center; text-align: center; padding: 1.4rem 1rem; }
+}
+
 /* Example exhibit */
 .example-card { background: var(--card); border: 2px solid var(--ink);
   padding: 1.4rem 1.6rem; margin: 0 0 1.6rem; position: relative; padding-right: 3.4rem;
@@ -359,6 +448,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z"/></symbol>
   <symbol id="i-sun" viewBox="0 0 24 24"><path d="M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM12 1v3M12 20v3M1 12h3M20 12h3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/></symbol>
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h15M13 6l6 6-6 6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M4 12.5l5 5L20 6.5"/></symbol>
 </svg>
 
 <div class="overlay" id="loader" role="status" aria-live="polite">
@@ -453,12 +543,13 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 
 <main>
   <nav class="tabs" aria-label="Dashboard sections">
-    {% set tabs = [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy'),('query','Query')] %}
+    {% set tabs = [('summary','Summary'),('flagged','Flagged records'),('tax','Tax and liability'),('anomaly','Unusual records'),('accuracy','Accuracy'),('verify','Verification'),('query','Query')] %}
     {% for t, lbl in tabs %}
       <a href="?n={{n}}&rate={{rate}}&seed={{seed}}&tab={{t}}{% if t=='flagged' and q %}&q={{q}}{% endif %}{% if t=='flagged' and kind!='All' %}&kind={{kind}}{% endif %}#dashboard" class="{% if active==t %}active{% endif %}"{% if active==t %} aria-current="page"{% endif %}>{{ lbl }}</a>
     {% endfor %}
   </nav>
 
+  <div class="tab-panel" id="tabPanel">
   {% if active == 'summary' %}
     <div class="restore-strip" id="restoreStrip" hidden><span>Example hidden.</span> <button type="button" class="link-btn" id="showExample">Show example</button></div>
     {% if example %}
@@ -601,6 +692,42 @@ footer :focus-visible { outline-color: var(--fixed-link); }
     </ul>
     <script>Plotly.newPlot('acc', {{ accuracy.data|tojson }}, {{ accuracy.layout|tojson }}, {displayModeBar:false, responsive:true});</script>
 
+  {% elif active == 'verify' %}
+    {% macro ring(score, passed, big=false, label='') -%}
+      {%- set r = 80 if big else 54 -%}{%- set sw = 14 if big else 11 -%}{%- set c = 2 * 3.14159265 * r -%}
+      <div class="ring{% if big %} big{% endif %}{% if not passed %} fail{% endif %}" role="img" aria-label="{{ label }}: {{ '%.1f'|format(score) }}%, {{ 'pass' if passed else 'fail' }}">
+        <svg viewBox="0 0 {{ 2 * (r + sw) }} {{ 2 * (r + sw) }}" aria-hidden="true">
+          <circle class="track" cx="{{ r + sw }}" cy="{{ r + sw }}" r="{{ r }}" stroke-width="{{ sw }}"/>
+          <circle class="fill" cx="{{ r + sw }}" cy="{{ r + sw }}" r="{{ r }}" stroke-width="{{ sw }}"
+                  stroke-dasharray="{{ '%.2f'|format(c) }}" stroke-dashoffset="{{ '%.2f'|format(c * (1 - score / 100)) }}"
+                  data-circ="{{ '%.2f'|format(c) }}" data-score="{{ score }}"/>
+        </svg>
+        <div class="score"><b>{{ '%.1f'|format(score) }}%</b><small>{{ 'Overall' if big else 'Clean' }}</small></div>
+      </div>
+    {%- endmacro %}
+    {% macro chip(passed) -%}
+      <span class="verdict-chip {{ 'pass' if passed else 'fail' }}"><svg class="ico" aria-hidden="true"><use href="#{{ 'i-check' if passed else 'i-close' }}"/></svg>{{ 'Pass' if passed else 'Fail' }}</span>
+    {%- endmacro %}
+    <section class="verify-hero" data-reveal>
+      {{ ring(verify.score, verify.all_pass, true, 'Overall verification score') }}
+      <div>
+        <h2>{% if verify.all_pass %}Reconciliation verified{% else %}{{ verify.passed }} of {{ verify.count }} checks pass{% endif %}</h2>
+        <p>The overall score is the average of the {{ verify.count }} checks below, each computed from this run's invoices, bank payments, ledger and flags.</p>
+        <p class="note" style="margin-top:.2rem;">A check passes when at least {{ '%.0f'|format(verify.materiality) }}% of its records are clean (the materiality threshold). Every exception is listed under Flagged records.</p>
+        <div style="margin-top:.6rem;">{{ chip(verify.all_pass) }}</div>
+      </div>
+    </section>
+    <div class="verify-grid">
+      {% for c in verify.checks %}
+      <article class="check" data-reveal>
+        {{ ring(c.score, c.passed, false, c.title) }}
+        {{ chip(c.passed) }}
+        <h3>{{ c.title }}</h3>
+        <p class="detail">{{ c.detail }}</p>
+      </article>
+      {% endfor %}
+    </div>
+
   {% elif active == 'query' %}
     <div class="ask-wrap" data-reveal>
       <h2>Have a question?</h2>
@@ -613,6 +740,8 @@ footer :focus-visible { outline-color: var(--fixed-link); }
       <p class="note">Your question opens as a new issue on the project's GitHub repo, where you can review it before posting.</p>
     </div>
   {% endif %}
+  <div id="tab-panel-end"></div>
+  </div>
 </main>
 
 <footer class="dark-footer">
@@ -699,6 +828,69 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 
   if (!hasGsap || reduce) return;
   gsap.registerPlugin(ScrollTrigger);
+
+  var slide = window.__slide || {};
+  var panel = document.getElementById('tabPanel');
+  var DUR = .35, EASE = 'power3.inOut';
+
+  /* GSAP fallback for browsers without cross-document View Transitions. */
+  if (!slide.vt && panel) {
+    var W = function () { return window.innerWidth; };
+    var arrive = function (dir) {
+      gsap.fromTo(panel, { x: dir === 'back' ? -W() : W() }, { x: 0, duration: DUR, ease: EASE, clearProps: 'transform' });
+    };
+    if (slide.dir) arrive(slide.dir);
+    /* Restored from the back/forward cache: the panel was left off-screen; bring it back by tab order. */
+    window.addEventListener('pageshow', function (e) {
+      if (!e.persisted) return;
+      var prev = null; try { prev = sessionStorage.getItem('lastTab'); sessionStorage.setItem('lastTab', new URL(location.href).searchParams.get('tab') || 'summary'); } catch (er) {}
+      arrive(prev ? slide.dirFor('?tab=' + prev, location.href, true) : 'back');
+    });
+
+    var leaving = false;
+    var leave = function (dir, go) {
+      if (leaving) return; leaving = true;
+      try { sessionStorage.setItem('slide', dir); } catch (e) {}
+      gsap.to(panel, { x: dir === 'back' ? W() : -W(), duration: DUR, ease: EASE, onComplete: go });
+      setTimeout(go, DUR * 1000 + 150); /* never strand the click if a frame is dropped */
+    };
+    var samePage = function (u) { return u.pathname === location.pathname && u.search === location.search; };
+    document.addEventListener('click', function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var a = e.target.closest && e.target.closest('a[href]');
+      if (!a || a.target === '_blank' || a.hasAttribute('download')) return;
+      var u = new URL(a.href, location.href);
+      if (u.origin !== location.origin || u.pathname.indexOf('/download/') === 0) return;
+      if (samePage(u) && u.hash) return; /* in-page anchor: let it scroll */
+      e.preventDefault();
+      var done = false;
+      leave(slide.dirFor(location.href, u.href, false), function () { if (!done) { done = true; location.href = u.href; } });
+    });
+    document.addEventListener('submit', function (e) {
+      var f = e.target;
+      if (e.defaultPrevented || !f || f.method.toLowerCase() !== 'get' || f.id === 'askForm') return;
+      e.preventDefault();
+      var done = false;
+      leave('forward', function () { if (!done) { done = true; HTMLFormElement.prototype.submit.call(f); } });
+    });
+  }
+
+  /* Verification rings fill from empty to their score when the tab opens. The score text never counts. */
+  var fills = document.querySelectorAll('.ring .fill');
+  if (fills.length) {
+    Array.prototype.forEach.call(fills, function (el, i) {
+      var c = parseFloat(el.dataset.circ), target = c * (1 - parseFloat(el.dataset.score) / 100);
+      gsap.fromTo(el, { strokeDashoffset: c }, { strokeDashoffset: target, duration: 1.1, ease: 'power3.out',
+        delay: (slide.dir ? DUR : 0) + .15 + i * .07 });
+    });
+  }
+
+  /* On a slide arrival the panel's sheets are already in place; only the slide moves. */
+  if (slide.dir && panel) {
+    var inPanel = panel.querySelectorAll('[data-reveal]');
+    gsap.set(inPanel, { autoAlpha: 1 });
+    Array.prototype.forEach.call(inPanel, function (el) { el.removeAttribute('data-reveal'); });
+  }
 
   /* A sheet starts lifted (up-left, longer shadow) and settles to its resting offset. */
   function lifted(shadow) {
