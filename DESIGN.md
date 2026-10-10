@@ -251,6 +251,9 @@ Each flag explains itself in columns: Problem, Invoice / payment, Party, Date ("
 ### Ledger columns
 The homepage's "What we do" is one ruled sheet split into three ledger columns by 2px ink rules (stacked rows on mobile), not three floating cards. No section numbers, and no hover lift on things that aren't clickable.
 
+### Verification rings
+A ring per check on the Verification tab: an 11px stroke on a Rule Grey track (14px for the overall ring), Audit Blue when the check passes and Fail red (#c8321f light, #ff6b57 dark) when it doesn't. The score sits in the middle in Figure type and never counts up; only the stroke fills (1.1s, power3.out, staggered). Below it is a Pass / Fail chip with a drawn icon, then the check name and a sentence of real counts. Fail red is a status colour only: it always comes with the icon and the word, and is never used as an accent. The overall ring sits in the one Exhibit sheet with the blue shadow.
+
 ### Loader
 A blurred paper veil (5px backdrop blur) behind a single white sheet with an 8px blue shadow, three pulsing blue squares, and "Running reconciliation · Checking invoices · bank · ledger".
 
