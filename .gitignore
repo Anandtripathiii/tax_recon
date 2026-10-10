@@ -1,1 +1,17 @@
 __pycache__/ 
+
+# Secrets: API keys live in .env, never in the code or the repo
+.env
+.env.*
+!.env.example
+
+# Local virtual environments
+.venv/
+
+# Local user database (login)
+*.sqlite3
+instance/
+.env 
+*.db 
+*.sqlite 
+.env 
