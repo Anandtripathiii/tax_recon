@@ -74,8 +74,8 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
 
 /* Three stacked sheets: home (locked) -> Live Proof sheet slides over it (then locks) -> Ledger app screen slides over that.
    Each sheet is opaque graph paper with a hard ink edge on top. */
-.home { position: relative; z-index: 0; }
-.deck { position: relative; z-index: 2; background-color: var(--bg); background-image: var(--paper-grid);
+.home { position: sticky; top: 0; z-index: 0; }
+.deck { position: sticky; top: var(--stick-top, 0px); margin-top: 400px; z-index: 2; background-color: var(--bg); background-image: var(--paper-grid);
   background-size: 60px 60px; box-shadow: var(--cover-shadow); }
 .app { position: relative; z-index: 3; display: flex; flex-direction: column; background-color: var(--bg);
   box-shadow: var(--cover-shadow); }
@@ -770,7 +770,6 @@ footer :focus-visible { outline-color: var(--fixed-link); }
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" onerror="document.documentElement.classList.remove('motion')"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
 <script>
 /* Theme toggle */
 (function () {
@@ -799,7 +798,7 @@ document.addEventListener('submit', function (e) {
    the dashboard deck sliding up over the pinned home section. */
 (function () {
   var root = document.documentElement;
-  var hasGsap = !!(window.gsap && window.ScrollTrigger);
+  var hasGsap = !!window.gsap;
   var reduce = (window.__motion || {}).reduce;
   if (!hasGsap || reduce) root.classList.remove('motion');
   var DUR = .35;
@@ -904,7 +903,6 @@ document.addEventListener('submit', function (e) {
         var animate = dir && !reduce;
         var done = function () {
           root.removeAttribute('data-slide');
-          if (hasGsap) ScrollTrigger.refresh();
           window.scrollTo(0, keepY);
           fillRings(0);
           if (opts.scrollToDashboard) document.getElementById('dashboard').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
@@ -984,36 +982,20 @@ document.addEventListener('submit', function (e) {
   window.addEventListener('load', lockState);
   lockState();
 
-  if (!hasGsap || reduce) { toDashboard(); window.addEventListener('load', toDashboard); return; }
-  gsap.registerPlugin(ScrollTrigger);
+  /* Live Proof sticks with its bottom at the screen's bottom when it is taller than the screen, otherwise at the top,
+     so every part of it is visible before the Ledger sheet covers it. */
+  var deck = document.getElementById('deck');
+  var stickTop = function () {
+    if (deck) deck.style.setProperty('--stick-top', Math.min(0, window.innerHeight - deck.offsetHeight) + 'px');
+  };
+  stickTop();
+  window.addEventListener('resize', stickTop);
 
-  /* Home is locked for the first 4 wheel ticks (HOLD px of scroll), then the deck slides up over it.
-     The deck is pushed down by HOLD so nothing moves during the lock; pinSpacing: false lets it scroll over home. */
-  var HOLD = 400;
-  var home = document.getElementById('home'), deck = document.getElementById('deck');
-  if (home && deck) {
-    deck.style.marginTop = HOLD + 'px';
-    align();
-    ScrollTrigger.create({
-      trigger: home, endTrigger: deck, start: 'top top', end: 'top top',
-      pin: true, pinSpacing: false, invalidateOnRefresh: true
-    });
-  }
-  /* The Live Proof sheet locks once it is fully on screen (its bottom at the screen's bottom, or its top at the top if it
-     is shorter than the screen), and the Ledger app screen slides up over it. */
-  if (deck && app) {
-    ScrollTrigger.create({
-      trigger: deck, endTrigger: app,
-      start: function () { return deck.offsetHeight > window.innerHeight ? 'bottom bottom' : 'top top'; },
-      end: 'top top', pin: true, pinSpacing: false, invalidateOnRefresh: true,
-      onRefresh: lockState
-    });
-  }
   fillRings(0);
   toDashboard();
-  var refresh = function () { align(); ScrollTrigger.refresh(); toDashboard(); };
-  window.addEventListener('load', refresh);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
+  var settle = function () { stickTop(); align(); toDashboard(); lockState(); };
+  window.addEventListener('load', settle);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(settle);
 })();
 </script>
 </body>
