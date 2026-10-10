@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Accuracy method · Tax Reconciliation{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Accuracy <span class="accent">method</span></h1>
+  <p>We can measure accuracy honestly because the demo data comes with an answer key: the generator records every error it plants, and the engine never sees that list. Flags are compared with it only after the run.</p>
+</div>
+<div class="facts">
+  <div class="fact"><b>Precision</b><p>Of the records the engine flagged as an error type, the share that really had that error. High precision means few false alarms.</p></div>
+  <div class="fact"><b>Recall</b><p>Of the errors that were planted, the share the engine caught. High recall means few misses.</p></div>
+  <div class="fact"><b>F1</b><p>One number that balances the two: 2 × precision × recall ÷ (precision + recall).</p></div>
+  <div class="fact"><b>Counted per error type</b><p>A wrong-GST flag on a record planted as an amount mismatch counts as a false alarm for wrong GST and a miss for amount mismatch.</p></div>
+</div>
+
+<h2 class="sub-title">Measured on the default run ({{ '{:,}'.format(n) }} invoices, {{ rate }}% errors, seed {{ seed }})</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Error type</th><th class="num">Planted</th><th class="num">Flagged</th><th class="num">Correct</th><th class="num">Precision</th><th class="num">Recall</th><th class="num">F1</th></tr></thead>
+  <tbody>{% for r in rows %}<tr><td>{{ r.label }}</td><td class="num">{{ r.planted }}</td><td class="num">{{ r.flagged }}</td><td class="num">{{ r.correct }}</td><td class="num">{{ r.precision }}</td><td class="num">{{ r.recall }}</td><td class="num">{{ r.f1 }}</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="note">Computed live when this page loads. Change the run on the dashboard's Accuracy tab to see other sizes, error rates and seeds.</p>
+
+<h2 class="sub-title">Why fuzzy matching matters</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>Error type</th><th class="num">Precision, exact match only</th><th class="num">Precision, full matching</th></tr></thead>
+  <tbody>{% for r in cmp %}<tr><td>{{ r.label }}</td><td class="num">{{ r.p0 }}</td><td class="num">{{ r.p1 }}</td></tr>{% endfor %}</tbody>
+</table></div>
+<p class="note">Payments that carry no invoice number cannot be matched by number. Without fuzzy matching on party, amount and date they show up as missing payments and as payments with no invoice, which is what drags precision down in the left column.</p>
+
+<div class="prose">
+  <h2 class="sub-title">What these numbers do not prove</h2>
+  <ul>
+    <li>The data is generated. Real books have error patterns this generator does not plant, so real-world accuracy has to be measured on real, labelled data.</li>
+    <li>The ML score is not a rule. Its precision is low on purpose: it is tuned to surface a short review queue, and most of what it marks is unusual but legitimate.</li>
+    <li>A check that scores well here can still miss an error of a kind the generator never makes. The answer key only covers what was planted.</li>
+  </ul>
+</div>
+{% endblock %}

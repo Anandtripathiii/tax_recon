@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}How it works · Tax Reconciliation{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>How it <span class="accent">works</span></h1>
+  <p>One run takes three record sets (sales and purchase invoices, the bank statement, and the ledger), links them, checks them, and scores what looks unusual. These are the actual rules and thresholds the engine uses.</p>
+</div>
+<ol class="steps">
+  <li><div><h3>Generate the books (demo data)</h3>
+    <p>The generator builds {{ '{:,}'.format(n) }} invoices for 100 parties (half customers, half suppliers, each with a GSTIN) across one financial year, with GST at {{ slabs }}%, plus matching bank transactions and ledger entries.</p>
+    <p>It then plants errors in {{ rate }}% of invoices, in this mix: {{ mix }}. It also adds a few unusually large invoices and bank payments with no invoice. The list of planted errors is kept in a separate answer key the engine never sees.</p></div></li>
+  <li><div><h3>Find duplicates</h3>
+    <p>An invoice is a duplicate when an earlier invoice has the same GSTIN and the same total within 7 days. Duplicates are set aside so they are never matched or counted twice.</p></div></li>
+  <li><div><h3>Match each invoice to its bank payment</h3>
+    <p><b>Exact:</b> the invoice number is read from the bank narration (for example "NEFT/INV-1029/…").</p>
+    <p><b>Fuzzy</b>, for payments with no usable invoice number: a score of 50% party-name similarity (RapidFuzz WRatio), 30% amount (full marks when equal, zero at 2% apart) and 20% timing (full marks if paid within 30 days, falling to zero at 60). The money must flow the right way (sales in, purchases out). A pair is linked when the score reaches {{ match_pct }}%, best pairs first, each payment used once.</p></div></li>
+  <li><div><h3>Match each invoice to the ledger</h3>
+    <p>Ledger entries carry the invoice reference, so each invoice is linked to its entry directly.</p></div></li>
+  <li><div><h3>Run the checks</h3>
+    <p><b>Wrong GST:</b> tax charged differs from taxable value × rate by more than ₹{{ tol }}, or the rate is not a real slab.</p>
+    <p><b>Amount mismatch:</b> bank or ledger amount differs from the invoice total by more than ₹1.</p>
+    <p><b>Missing payment / missing ledger entry:</b> nothing could be linked.</p>
+    <p><b>Date shift:</b> paid more than {{ pay_days }} days after the invoice, or booked in the ledger more than {{ led_days }} days after it.</p>
+    <p><b>Payment with no invoice:</b> a bank transaction no invoice was linked to.</p>
+    <p>Every flag records what was expected, what was found, the rupees at stake and a suggested next step.</p></div></li>
+  <li><div><h3>Score what looks unusual</h3>
+    <p>An Isolation Forest (100 trees, 5% expected outliers) looks at six features: invoice size, distance from the party's usual amount, tax-to-value ratio, payment lag, weekday, and whether the taxable value is a round thousand. Scores are scaled from 0 (typical) to 1 (most unusual). This is a review queue, not a verdict.</p></div></li>
+  <li><div><h3>Work out the tax position</h3>
+    <p>Net GST is output tax on sales minus input tax credit on purchases, shown two ways: as filed (every invoice) and clean (only fully matched invoices). ITC on purchases that are not fully matched is shown as at risk.</p></div></li>
+  <li><div><h3>Measure accuracy</h3>
+    <p>Only at the end are the flags compared with the answer key, to measure precision and recall for every error type. See <a href="/accuracy-method">Accuracy method</a>.</p></div></li>
+</ol>
+<div class="page-cta">
+  <a class="btn-blue" href="/#dashboard">Open the dashboard <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+  <a class="btn-dark" href="/sample-data">Get the sample data</a>
+</div>
+{% endblock %}

@@ -14,19 +14,22 @@ import pandas as pd
 import plotly
 import plotly.express as px
 import plotly.graph_objects as go
-from flask import Flask, Response, abort, render_template, request, send_file
+from flask import Flask, Response, abort, jsonify, render_template, request, send_file
 
-from engine import LEDGER_LATE_DAYS, PAY_LATE_DAYS, SLABS, TAX_TOLERANCE, evaluate, run_all, to_excel
+from engine import LEDGER_LATE_DAYS, MATCH_SCORE, PAY_LATE_DAYS, SLABS, TAX_TOLERANCE, evaluate, run_all, to_excel
 from generator import make_data
+import ask as asker
+import auth
+from flask_login import current_user, login_required
+import ledger as L
+from ledger import LABELS, evidence, rs
+
+asker.load_env()
 
 # Audit Ledger chart palette: brand blue first, then a CVD-validated categorical order.
 # Charts always sit on a white card (both themes), so only the light steps are needed.
 INK, BLUE, ORANGE, QUIET = "#0a0a0f", "#2d4bff", "#eb6834", "#c3c8d4"
 SERIES = [BLUE, ORANGE, "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
-LABELS = {"amount_mismatch": "Amount mismatch", "duplicate": "Duplicate invoice", "wrong_gst": "Wrong GST",
-          "missing_payment": "Missing payment", "missing_ledger": "Missing ledger entry",
-          "date_shift": "Date shift", "orphan_payment": "Payment with no invoice",
-          "anomalous_amount": "Unusual amount (ML)"}
 TEMPLATE = {"layout": dict(
     paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#ffffff",
     font=dict(family="Inter, -apple-system, 'Segoe UI', sans-serif", color=INK, size=13),
@@ -40,21 +43,6 @@ TEMPLATE = {"layout": dict(
 def fig(f):
     f.update_layout(**TEMPLATE["layout"])
     return json.loads(f.to_json())
-
-
-def rs(x):
-    """Format a rupee amount in Indian style: Lakh / Crore."""
-    try:
-        x = float(x)
-    except (TypeError, ValueError):
-        return ""
-    if x < 0:
-        return "-" + rs(-x)
-    if x >= 1e7:
-        return f"₹{x / 1e7:.2f} Cr"
-    if x >= 1e5:
-        return f"₹{x / 1e5:.2f} L"
-    return f"₹{x:,.0f}"
 
 
 _cache = {}
@@ -107,29 +95,40 @@ def _warmup():
 threading.Thread(target=_warmup, daemon=True).start()
 
 
-def evidence(r, orphan_amt):
-    """Expected value, found value and rupees at stake for one flag, so every row explains itself."""
-    t = r.error_type
-    if t == "wrong_gst":
-        return f"Tax {rs(r.expected_tax)}", f"Tax {rs(r.tax_amount)}", abs(r.tax_amount - r.expected_tax)
-    if t == "amount_mismatch":
-        gaps = {"Bank": r.bank_amount, "Ledger": r.led_amount}
-        src, val = max(gaps.items(), key=lambda kv: abs((kv[1] if pd.notna(kv[1]) else r.total) - r.total))
-        return f"{rs(r.total)} in all three", f"{src} {rs(val)}", abs(val - r.total)
-    if t == "missing_payment":
-        return f"Payment of {rs(r.total)}", "No bank payment", r.total
-    if t == "missing_ledger":
-        return f"Ledger entry of {rs(r.total)}", "No ledger entry", r.total
-    if t == "duplicate":
-        return "One invoice", "A second copy", r.total
-    if t == "date_shift":
-        if pd.notna(r.bank_lag) and r.bank_lag > PAY_LATE_DAYS:
-            return f"Paid within {PAY_LATE_DAYS} days", f"Paid after {r.bank_lag:.0f} days", float("nan")
-        return f"Booked within {LEDGER_LATE_DAYS} days", f"Booked after {r.led_lag:.0f} days", float("nan")
-    if t == "orphan_payment":
-        amt = orphan_amt.get(r.key, float("nan"))
-        return "A matching invoice", f"Payment of {rs(amt)}", amt
-    return "", "", float("nan")
+def _amount(v):
+    """Parse an amount filter: plain rupees, or with L / Cr (e.g. 1.5L, 2cr). Blank means no limit."""
+    v = (v or "").strip().lower().replace(",", "").replace("₹", "")
+    if not v:
+        return None
+    mult = 1
+    if v.endswith("cr"):
+        mult, v = 1e7, v[:-2]
+    elif v.endswith("l"):
+        mult, v = 1e5, v[:-1]
+    try:
+        return float(v) * mult
+    except ValueError:
+        return None
+
+
+def flag_filters(a):
+    return {"q": (a.get("q") or "").strip(), "kind": a.get("kind", "All"), "party": (a.get("party") or "").strip(),
+            "min_amt": _amount(a.get("min")), "max_amt": _amount(a.get("max")),
+            "sort": a.get("sort", "stake"), "order": a.get("order", "desc")}
+
+
+def unusual_filters(a):
+    return {"q": (a.get("q") or "").strip(), "party": (a.get("party") or "").strip(),
+            "min_amt": _amount(a.get("min")), "max_amt": _amount(a.get("max")),
+            "only_marked": a.get("show", "marked") == "marked",
+            "sort": a.get("sort", "score"), "order": a.get("order", "desc")}
+
+
+def run_args(a):
+    n = max(500, min(5000, a.get("n", 3000, type=int)))
+    rate = max(0.02, min(0.25, a.get("rate", 10, type=int) / 100))
+    seed = a.get("seed", 42, type=int)
+    return n, rate, seed
 
 
 def live_proof(res, ev, elapsed):
@@ -229,7 +228,30 @@ def pick_example(res, truth):
 
 
 app = Flask(__name__)
+app.json.sort_keys = False  # keep record fields in reading order (Invoice, Party, GSTIN, Date...)
+auth.init_app(app)
 PLOTLY_JS = str(next(pathlib.Path(plotly.__path__[0]).rglob("plotly.min.js")))
+
+
+@app.context_processor
+def _template_helpers():
+    """url_with(**changes): the current page URL with some query args changed (for sort links);
+    qs(): the current query string (for exports of the filtered view)."""
+    from urllib.parse import urlencode
+
+    def url_with(**changes):
+        args = request.args.to_dict()
+        args.update({k: v for k, v in changes.items() if v is not None})
+        return "/?" + urlencode(args) + "#dashboard"
+
+    def qs():
+        return urlencode(request.args.to_dict())
+
+    def asset(name):
+        f = pathlib.Path(app.static_folder) / name
+        return f"/static/{name}?v={int(f.stat().st_mtime) if f.exists() else 0}"
+
+    return {"url_with": url_with, "qs": qs, "asset": asset}
 
 
 @app.route("/plotly.min.js")
@@ -257,6 +279,10 @@ def index():
     seed = request.args.get("seed", 42, type=int)
     active = request.args.get("tab", "summary")
 
+    if not current_user.is_authenticated:
+        res, ev, _, elapsed, _ = compute(n, rate, seed)
+        return render_template("index.html", locked=True, active=active, n=n, rate=int(rate * 100), seed=seed,
+                               proof=live_proof(res, ev, elapsed), demo_email=auth.DEMO_EMAIL, demo_password=auth.DEMO_PASSWORD)
     res, ev, ev_base, elapsed, truth = compute(n, rate, seed, with_baseline=(active == "accuracy"))
     proof = live_proof(res, ev, elapsed)
     if active == "query":
@@ -264,7 +290,8 @@ def index():
                                proof=proof, kpis=[], tax_kpis=[], flagged=[], monthly=[], anomaly_tbl=[],
                                acc_tbl=[], cmp_rows=[], kinds=["All"], kind="All", q="",
                                donut=None, bars=None, gst=None, hist=None, scat=None, accuracy=None,
-                               fuzzy_count=0, example=None, total_filtered=0)
+                               fuzzy_count=0, example=None, total_filtered=0,
+                               suggest=asker.suggestions(res), ai_on=asker.ai_enabled(), locked=False)
     inv, flags, lia = res["inv"], res["flags"], res["liability"]
     status = inv.status.value_counts()
     orphans = len(res["orphans"])
@@ -302,33 +329,16 @@ def index():
             return [list(df.columns)]
         return [list(df.columns)] + df.astype(object).where(df.notna(), "").values.tolist()
 
-    kind = request.args.get("kind", "All")
-    q = (request.args.get("q", "") or "").strip()
-    t = flags.assign(problem=flags.error_type.map(LABELS))
-    t = t.merge(inv[["row_id", "invoice_id", "party", "date", "total", "tax_amount", "expected_tax",
-                     "bank_amount", "led_amount", "bank_lag", "led_lag"]],
-                left_on="key", right_on="row_id", how="left")
-    orphan_amt = res["bank"].set_index("txn_id").amount
-    ev_cols = t.apply(lambda r: pd.Series(evidence(r, orphan_amt), index=["expected", "found", "stake"]),
-                      axis=1) if len(t) else pd.DataFrame(columns=["expected", "found", "stake"])
-    t = t.join(ev_cols)
-    t["detail"] = t.detail.str.replace("Rs ", "₹", regex=False)
-    if kind != "All":
-        t = t[t.problem == kind]
-    if q:
-        hay = t[["party", "invoice_id", "detail", "key"]].astype(str)
-        mask = hay.apply(lambda c: c.str.contains(q, case=False, na=False)).any(axis=1)
-        t = t[mask]
+    ff = flag_filters(request.args)
+    kind, q = ff["kind"], ff["q"]
+    all_flags = L.flag_rows(res)
+    t = L.filter_flags(all_flags, **ff)
     total_filtered = len(t)
-    t = t.sort_values(["stake", "problem"], ascending=[False, True], na_position="last").head(500).copy()
-    t["date"] = pd.to_datetime(t["date"], errors="coerce").dt.strftime("%d %b %Y").fillna("")
-    t["invoice_id"] = t.invoice_id.fillna(t.key)
-    t["party"] = t.party.fillna("Unknown (bank only)")
-    t["stake"] = t.stake.apply(lambda x: rs(x) if pd.notna(x) else "")
-    flagged = tbl(t, ["problem", "invoice_id", "party", "date", "expected", "found", "stake", "detail"],
-                  {"problem": "Problem", "invoice_id": "Invoice / payment", "party": "Party",
-                   "date": "Date", "expected": "Expected", "found": "Found", "stake": "₹ at stake",
-                   "detail": "Why it was flagged"})
+    flag_list = [{"id": r.invoice_id, "problem": r.problem, "party": r.party,
+                  "date": r.date.strftime("%d %b %Y") if pd.notna(r.date) else "", "amount": rs(r.total),
+                  "expected": r.expected, "found": r.found, "stake": rs(r.stake) if pd.notna(r.stake) else "",
+                  "why": r.detail} for r in t.head(500).itertuples()]
+    parties = sorted(p for p in all_flags.party.unique() if p != "Unknown (bank only)")
 
     m = lia["monthly"]
     gst_fig = go.Figure()
@@ -346,6 +356,8 @@ def index():
         net_clean=m.net_clean.apply(rs), net_as_filed=m.net_as_filed.apply(rs)),
         rename={"month": "Month", "output_tax": "Output tax", "itc": "ITC",
                 "net_clean": "Net (clean)", "net_as_filed": "Net (as filed)"})
+    tax_b = L.tax_breakdown(res)
+    tax_text = L.tax_report_text(tax_b)
     wrong = inv[(inv.issues.str.contains("wrong_gst")) & (inv.status != "Duplicate")]
     tax_kpis = [("Net GST as filed", rs(m.net_as_filed.sum())),
                 ("Net GST, clean only", rs(m.net_clean.sum())),
@@ -365,18 +377,14 @@ def index():
                           labels={"log_amount": "Invoice size (log scale)",
                                   "party_z": "Distance from party's average", "group": ""}
                           ).update_layout(legend=dict(orientation="h", y=-0.25, x=0)))
-    top = inv.sort_values("anomaly_score", ascending=False).head(25).copy()
-    top["date"] = top["date"].dt.strftime("%d %b %Y")
-    top["why"] = top.party_z.apply(lambda z: f"{abs(z):.1f} std. dev. {'above' if z > 0 else 'below'} "
-                                             f"this party's usual amount")
-    top["issues"] = top.issues.apply(
-        lambda v: ", ".join(LABELS.get(c.strip(), c.strip()) for c in v.split(",") if c.strip()))
-    top["total"] = top["total"].apply(rs)
-    top["party_z"] = top["party_z"].round(2)
-    top["anomaly_score"] = top["anomaly_score"].round(3)
-    anomaly_tbl = tbl(top, ["invoice_id", "party", "date", "total", "why", "anomaly_score", "issues"],
-                      {"invoice_id": "Invoice", "party": "Party", "date": "Date", "total": "Total",
-                       "why": "What looks unusual", "anomaly_score": "Score", "issues": "Also flagged for"})
+    uf = unusual_filters(request.args)
+    u_all = L.unusual_rows(res)
+    u = L.filter_unusual(u_all, **uf)
+    unusual_total = len(u)
+    unusual_list = [{"id": r.invoice_id, "party": r.party, "date": r.date.strftime("%d %b %Y"), "amount": rs(r.total),
+                     "score": f"{r.anomaly_score:.3f}", "why": r.why, "also": r.also, "marked": bool(r.anomaly)}
+                    for r in u.head(300).itertuples()]
+    marked_count = int(u_all.anomaly.sum())
 
     e = ev.assign(error_type=ev.error_type.map(LABELS))
     acc_fig = go.Figure()
@@ -412,14 +420,16 @@ def index():
 
     return render_template(
         "index.html", n=n, rate=int(rate * 100), seed=seed,
-        kpis=kpis, donut=donut, bars=bars, flagged=flagged, total_filtered=total_filtered,
-        kinds=kinds, kind=kind, q=q,
-        tax_kpis=tax_kpis, gst=gst, monthly=monthly, hist=hist, scat=scat, anomaly_tbl=anomaly_tbl,
+        kpis=kpis, donut=donut, bars=bars, flag_list=flag_list, total_filtered=total_filtered,
+        kinds=kinds, kind=kind, q=q, ff=ff, parties=parties, uf=uf, unusual_list=unusual_list,
+        unusual_total=unusual_total, marked_count=marked_count, tax_b=tax_b, tax_text=tax_text, rupees=L.rupees,
+        tax_kpis=tax_kpis, gst=gst, monthly=monthly, hist=hist, scat=scat,
         accuracy=accuracy, acc_tbl=acc_tbl, cmp_rows=cmp_rows, fuzzy_count=fuzzy_count,
-        proof=proof, example=example, verify=verify, active=active)
+        proof=proof, example=example, verify=verify, active=active, locked=False)
 
 
 @app.route("/download/<kind>")
+@login_required
 def download(kind):
     n = max(500, min(5000, request.args.get("n", 3000, type=int)))
     rate = max(0.02, min(0.25, request.args.get("rate", 10, type=int) / 100))
@@ -435,6 +445,152 @@ def download(kind):
         return Response(buf.getvalue(), mimetype="text/csv",
                         headers={"Content-Disposition": "attachment; filename=flagged_records.csv"})
     abort(404)
+
+
+def _send_table(sheets, fmt, name):
+    """sheets: list of (sheet name, DataFrame). CSV uses the first sheet, with a BOM so Excel reads ₹ correctly."""
+    if fmt == "csv":
+        return Response(sheets[0][1].to_csv(index=False).encode("utf-8-sig"), mimetype="text/csv",
+                        headers={"Content-Disposition": f"attachment; filename={name}.csv"})
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as xw:
+        for title, df in sheets:
+            df.to_excel(xw, sheet_name=title[:31], index=False)
+            ws = xw.sheets[title[:31]]
+            for col in ws.columns:
+                width = max(len(str(c.value)) if c.value is not None else 0 for c in col[:200])
+                ws.column_dimensions[col[0].column_letter].width = min(max(10, width + 2), 60)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name=f"{name}.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+@app.route("/export/<view>.<fmt>")
+@login_required
+def export(view, fmt):
+    """Export exactly what the tab shows: the same filters and sort, every matching row (not just the first 500)."""
+    if fmt not in ("csv", "xlsx"):
+        abort(404)
+    n, rate, seed = run_args(request.args)
+    res, ev, _, _, _ = compute(n, rate, seed)
+    if view == "flagged":
+        t = L.filter_flags(L.flag_rows(res), **flag_filters(request.args))
+        return _send_table([("Flagged records", L.flags_export(t))], fmt, "flagged_records")
+    if view == "unusual":
+        u = L.filter_unusual(L.unusual_rows(res), **unusual_filters(request.args))
+        return _send_table([("Unusual records", L.unusual_export(u))], fmt, "unusual_records")
+    if view == "tax":
+        b = L.tax_breakdown(res)
+        rows = []
+        for label, key in (("As filed (all invoices)", "as_filed"), ("Clean (matched only)", "clean")):
+            t = b[key]
+            rows += [(label, "Taxable sales", round(t["taxable_sales"], 2)), (label, "Output tax", round(t["output_tax"], 2)),
+                     (label, "Taxable purchases", round(t["taxable_purchases"], 2)), (label, "Input tax credit", round(t["itc"], 2)),
+                     (label, "Net GST payable", round(t["net"], 2)), (label, "Invoices", t["invoices"])]
+        rows += [("Adjustments", "ITC at risk", round(b["itc_at_risk"], 2)),
+                 ("Adjustments", "Excess tax charged (wrong GST)", round(b["excess_tax_charged"], 2)),
+                 ("Adjustments", "Tax short-charged (wrong GST)", round(b["short_tax_charged"], 2))]
+        summary = pd.DataFrame(rows, columns=["Basis", "Item", "₹"])
+        slabs = pd.DataFrame(b["slabs"]).rename(columns={"rate": "GST rate", "sales_taxable": "Taxable sales (₹)",
+                                                          "output_tax": "Output tax (₹)", "purchase_taxable": "Taxable purchases (₹)",
+                                                          "itc": "ITC (₹)", "invoices": "Invoices"})
+        months = pd.DataFrame(b["months"]).rename(columns={"month": "Month", "output_tax": "Output tax (₹)", "itc": "ITC (₹)",
+                                                            "net_clean": "Net, clean (₹)", "net_as_filed": "Net, as filed (₹)"})
+        return _send_table([("Summary", summary), ("By rate", slabs.round(2)), ("By month", months.round(2))], fmt, "gst_summary")
+    abort(404)
+
+
+@app.route("/record/<rid>")
+@login_required
+def record(rid):
+    n, rate, seed = run_args(request.args)
+    res, ev, _, _, _ = compute(n, rate, seed)
+    d = L.record_detail(res, rid)
+    if d is None:
+        return jsonify({"error": f"No invoice or payment {rid} in this run."}), 404
+    return jsonify(d)
+
+
+@app.route("/ask", methods=["POST"])
+@login_required
+def ask_route():
+    body = request.get_json(silent=True) or {}
+    a = {k: body.get(k) for k in ("n", "rate", "seed")}
+    n = max(500, min(5000, int(a["n"] or 3000)))
+    rate = max(0.02, min(0.25, int(a["rate"] or 10) / 100))
+    seed = int(a["seed"] or 42)
+    res, ev, _, _, _ = compute(n, rate, seed)
+    ctx = {"res": res, "ev": ev, "run": {"invoices_requested": n, "error_rate": f"{int(rate * 100)}%", "seed": seed}}
+    return jsonify(asker.answer(body.get("question", ""), ctx))
+
+
+@app.route("/how-it-works")
+def how_it_works():
+    from generator import ERROR_MIX
+    mix = ", ".join(f"{LABELS[k]} {int(v * 100)}%" for k, v in ERROR_MIX.items())
+    return render_template("pages/how_it_works.html", n=3000, rate=10, slabs=" / ".join(str(x) for x in sorted(SLABS)),
+                           mix=mix, match_pct=int(MATCH_SCORE * 100), tol=TAX_TOLERANCE, pay_days=PAY_LATE_DAYS,
+                           led_days=LEDGER_LATE_DAYS)
+
+
+@app.route("/accuracy-method")
+def accuracy_method():
+    n, rate, seed = 3000, 0.10, 42
+    res, ev, ev_base, _, _ = compute(n, rate, seed, with_baseline=True)
+    pct = lambda x: f"{x * 100:.1f}%"
+    rows = [{"label": LABELS.get(r.error_type, r.error_type), "planted": r.planted, "flagged": r.flagged,
+             "correct": r.correct, "precision": pct(r.precision), "recall": pct(r.recall), "f1": pct(r.f1)}
+            for r in ev.itertuples()]
+    base = ev_base.set_index("error_type")
+    cmp = [{"label": LABELS.get(r.error_type, r.error_type), "p0": pct(base.loc[r.error_type, "precision"]),
+            "p1": pct(r.precision)} for r in ev.itertuples() if r.error_type in base.index]
+    cmp.sort(key=lambda x: float(x["p0"][:-1]) - float(x["p1"][:-1]))
+    return render_template("pages/accuracy_method.html", rows=rows, cmp=cmp, n=n, rate=int(rate * 100), seed=seed)
+
+
+SAMPLE_FILES = [
+    ("invoices", "Invoices", "invoices", "Sales and purchase invoices, including the planted errors and duplicates."),
+    ("bank", "Bank statement", "bank", "Every bank transaction, money in and out, with the narration text the matcher reads."),
+    ("ledger", "Ledger", "ledger", "Ledger entries with the invoice reference, amount and tax booked."),
+    ("answer_key", "Answer key", "truth", "The errors the generator planted: which record, and which error type. The engine never reads this."),
+]
+
+
+@app.route("/sample-data")
+def sample_data():
+    n, rate, seed = run_args(request.args)
+    data = _cache_data(n, rate, seed)
+    files = [{"key": k, "name": name, "about": about, "rows": len(data[src]), "cols": ", ".join(data[src].columns)}
+             for k, name, src, about in SAMPLE_FILES]
+    return render_template("pages/sample_data.html", files=files, n=n, rate=int(rate * 100), seed=seed)
+
+
+def _cache_data(n, rate, seed):
+    compute(n, rate, seed)
+    key = (int(n), round(float(rate), 4), int(seed))
+    with _lock:
+        return _cache[key]["d"]
+
+
+@app.route("/sample/<name>.csv")
+def sample_file(name):
+    src = {k: s for k, _, s, _ in SAMPLE_FILES}.get(name)
+    if src is None:
+        abort(404)
+    n, rate, seed = run_args(request.args)
+    df = _cache_data(n, rate, seed)[src]
+    return Response(df.to_csv(index=False).encode("utf-8-sig"), mimetype="text/csv",
+                    headers={"Content-Disposition": f"attachment; filename={name}_n{n}_r{int(rate * 100)}_s{seed}.csv"})
+
+
+@app.route("/about")
+def about():
+    return render_template("pages/about.html")
+
+
+@app.route("/contact")
+def contact():
+    return render_template("pages/contact.html")
 
 
 def _open_browser():

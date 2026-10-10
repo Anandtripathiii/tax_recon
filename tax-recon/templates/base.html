@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<title>{% block title %}Tax Reconciliation{% endblock %}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="{% block description %}GST reconciliation for chartered accountants: match invoices, bank payments and ledger entries, and catch the errors.{% endblock %}">
+<script>try { document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light'); } catch (e) {}</script>
+<link rel="icon" href="/favicon.ico" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ asset('app.css') }}">
+</head>
+<body>
+{% include "_sprite.html" %}
+<div class="wrap">
+  {% include "_nav.html" %}
+  {% block body %}
+  <main class="page" id="main">{% block content %}{% endblock %}</main>
+  {% endblock %}
+  <footer class="dark-footer page-foot">
+    <div class="footer-ghost" aria-hidden="true">TAX RECON</div>
+    <div class="footer-content">
+      <div class="footer-col">
+        <div class="label">Code</div>
+        <div class="value"><a href="https://github.com/Anandtripathiii/tax_recon" target="_blank" rel="noopener">github.com/Anandtripathiii/tax_recon</a></div>
+      </div>
+      <nav class="footer-nav" aria-label="Footer">
+        <a href="/#dashboard">Dashboard</a>
+        <a href="/how-it-works">How it works</a>
+        <a href="/accuracy-method">Accuracy</a>
+        <a href="/about">Team</a>
+      </nav>
+    </div>
+  </footer>
+</div>
+<script src="{{ asset('nav.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

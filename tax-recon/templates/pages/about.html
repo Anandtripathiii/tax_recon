@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}About Team Fourier · Tax Reconciliation{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>About <span class="accent">Team Fourier</span></h1>
+  <p>Team Fourier built Tax Reconciliation for the Fintechstico PS2 problem statement: match invoices, bank payments and ledger entries, then find wrong GST, duplicates, missing records and unusual invoices.</p>
+</div>
+<div class="prose">
+  <h2 class="sub-title">What we set out to do</h2>
+  <p>Reconciling GST is slow, manual work: an accountant ties every invoice to a payment and a ledger entry, recomputes the tax, and chases the gaps before filing. We wanted a tool that does the tying and checking automatically, explains every flag in plain words, and proves its accuracy instead of claiming it.</p>
+  <h2 class="sub-title">What is in the project</h2>
+  <ul>
+    <li><b>Generator</b>: realistic Indian books with GSTINs, the four GST slabs, and planted errors with an answer key.</li>
+    <li><b>Engine</b>: duplicate detection, exact and fuzzy payment matching, ledger matching, GST and record checks, an Isolation Forest anomaly score, and the tax position.</li>
+    <li><b>Dashboard</b>: flagged records with evidence and next steps, record detail side by side, tax totals for reports, accuracy, verification, and Ask the Ledger.</li>
+    <li><b>Measurement</b>: precision and recall for every error type, against the answer key, on every run.</li>
+  </ul>
+  <h2 class="sub-title">Built with</h2>
+  <p>Python, Flask, pandas, NumPy, scikit-learn, RapidFuzz, Plotly and openpyxl; Flask-Login and SQLite for accounts; Claude for Ask the Ledger; GSAP for page transitions.</p>
+  <h2 class="sub-title">Source code</h2>
+  <p>Everything is open: <a href="https://github.com/Anandtripathiii/tax_recon" target="_blank" rel="noopener">github.com/Anandtripathiii/tax_recon</a>.</p>
+</div>
+<div class="page-cta">
+  <a class="btn-blue" href="/#dashboard">Try the dashboard <svg class="ico" aria-hidden="true"><use href="#i-arrow"/></svg></a>
+  <a class="btn-dark" href="/contact">Contact us</a>
+</div>
+{% endblock %}

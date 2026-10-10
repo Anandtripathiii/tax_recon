@@ -1,0 +1,67 @@
+<header class="site-nav" id="siteNav">
+  <div class="nav-row">
+    <a class="brand-mark" href="/" aria-label="Tax Reconciliation home"><span class="mark" aria-hidden="true"></span>Tax<b>Recon</b></a>
+    <button type="button" class="btn nav-toggle" aria-expanded="false" aria-controls="navMenu"><svg class="ico" aria-hidden="true"><use href="#i-menu"/></svg>Menu</button>
+    <nav class="nav-menu" id="navMenu" aria-label="Main">
+      <ul class="nav-list">
+        <li class="nav-item">
+          <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="panel-product">Product<svg class="ico" aria-hidden="true"><use href="#i-down"/></svg></button>
+          <div class="nav-panel" id="panel-product" hidden>
+            <div class="panel-grid">
+              <a class="panel-link" href="/?tab=summary#dashboard"><b>Reconciliation</b><span>Match every invoice to its bank payment and ledger entry, by invoice number or by party, amount and date.</span></a>
+              <a class="panel-link" href="/?tab=flagged&amp;kind=Wrong+GST#dashboard"><b>GST check</b><span>Recompute tax on every invoice against the 5 / 12 / 18 / 28% slabs and list each wrong charge with the rupee difference.</span></a>
+              <a class="panel-link" href="/?tab=anomaly#dashboard"><b>Anomaly detection</b><span>An Isolation Forest scores how unusual each invoice looks. A review queue for things no rule describes.</span></a>
+              <a class="panel-link" href="/?tab=query#dashboard"><b>Ask the Ledger</b><span>Ask about mismatches, GST errors or what to fix before filing. Answers come only from the loaded data.</span></a>
+            </div>
+            <aside class="panel-aside">
+              <h3>Try it</h3>
+              <p>Every feature runs on generated books with planted errors, so you can check each answer against the answer key.</p>
+              <a class="btn" href="/#dashboard">Open the dashboard</a>
+            </aside>
+          </div>
+        </li>
+        <li class="nav-item">
+          <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="panel-resources">Resources<svg class="ico" aria-hidden="true"><use href="#i-down"/></svg></button>
+          <div class="nav-panel" id="panel-resources" hidden>
+            <div class="panel-grid">
+              <a class="panel-link" href="/how-it-works"><b>How it works</b><span>The pipeline step by step: duplicates, matching, GST and record checks, and the ML score.</span></a>
+              <a class="panel-link" href="/accuracy-method"><b>Accuracy method</b><span>How precision and recall are measured against planted errors, and what the numbers do not prove.</span></a>
+              <a class="panel-link" href="/sample-data"><b>Sample data</b><span>Download the invoices, bank statement, ledger and answer key behind any run.</span></a>
+              <a class="panel-link" href="https://github.com/Anandtripathiii/tax_recon" target="_blank" rel="noopener"><b>GitHub<svg class="ico" aria-hidden="true"><use href="#i-ext"/></svg></b><span>The full source code: engine, generator, dashboard and this site.</span></a>
+            </div>
+            <aside class="panel-aside">
+              <h3>Measured, not claimed</h3>
+              <p>Every accuracy figure on this site is computed live against the generator's answer key.</p>
+              <a class="btn" href="/accuracy-method">See the method</a>
+            </aside>
+          </div>
+        </li>
+        <li class="nav-item">
+          <button type="button" class="nav-trigger" aria-expanded="false" aria-controls="panel-team">Team<svg class="ico" aria-hidden="true"><use href="#i-down"/></svg></button>
+          <div class="nav-panel" id="panel-team" hidden>
+            <div class="panel-grid">
+              <a class="panel-link" href="/about"><b>About Team Fourier</b><span>Who built this, for which problem statement, and what is in the project.</span></a>
+              <a class="panel-link" href="/contact"><b>Contact</b><span>Questions, bug reports and feedback go to the project's GitHub issues.</span></a>
+            </div>
+            <aside class="panel-aside">
+              <h3>Fintechstico PS2</h3>
+              <p>Built for the tax reconciliation problem statement: match invoices, payments and books, and catch the errors.</p>
+            </aside>
+          </div>
+        </li>
+      </ul>
+      <div class="nav-auth">
+        {% if current_user.is_authenticated %}
+          <span class="who" title="{{ current_user.email }}">{{ current_user.name }}</span>
+          <form method="post" action="/logout"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit" class="btn">Log out</button></form>
+        {% else %}
+          <a class="btn" href="/login">Log in</a>
+          <a class="btn btn-primary" href="/signup">Sign up</a>
+        {% endif %}
+      </div>
+    </nav>
+  </div>
+  {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}
+  <div class="flash-row" role="status">{% for cat, msg in messages %}<div class="flash {{ cat }}">{{ msg }}</div>{% endfor %}</div>
+  {% endif %}{% endwith %}
+</header>

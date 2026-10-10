@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Log in' if mode == 'login' else 'Sign up' }} · Tax Reconciliation{% endblock %}
+{% block body %}
+<main class="auth-wrap" id="main">
+  <div class="auth-grid">
+    <section class="auth-card" aria-labelledby="authTitle">
+      {% if mode == 'login' %}
+        <h1 id="authTitle">Log in</h1>
+        <p>Log in to open the reconciliation dashboard.</p>
+        <form method="post" action="/login" class="auth-form" id="authForm">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ nxt }}">
+          <label class="fld"><span>Email</span><input type="email" name="email" id="email" value="{{ email }}" autocomplete="username" required autofocus></label>
+          <label class="fld"><span>Password</span><input type="password" name="password" id="password" autocomplete="current-password" required></label>
+          <label class="remember"><input type="checkbox" name="remember" value="1"> Keep me logged in on this device</label>
+          <button type="submit" class="btn-primary">Log in</button>
+        </form>
+        <p class="auth-alt">New here? <a href="/signup{% if nxt %}?next={{ nxt|urlencode }}{% endif %}">Create an account</a>.</p>
+      {% else %}
+        <h1 id="authTitle">Sign up</h1>
+        <p>Create an account to use the dashboard. Your password is stored only as a salted hash.</p>
+        <form method="post" action="/signup" class="auth-form">
+          <input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+          <input type="hidden" name="next" value="{{ nxt }}">
+          <label class="fld"><span>Name</span><input type="text" name="name" value="{{ form.name }}" autocomplete="name" maxlength="80" required autofocus></label>
+          <label class="fld"><span>Email</span><input type="email" name="email" value="{{ form.email }}" autocomplete="email" required></label>
+          <label class="fld"><span>Password (at least 8 characters)</span><input type="password" name="password" autocomplete="new-password" minlength="8" required></label>
+          <label class="fld"><span>Confirm password</span><input type="password" name="confirm" autocomplete="new-password" minlength="8" required></label>
+          <button type="submit" class="btn-primary">Create account</button>
+        </form>
+        <p class="auth-alt">Already have an account? <a href="/login{% if nxt %}?next={{ nxt|urlencode }}{% endif %}">Log in</a>.</p>
+      {% endif %}
+    </section>
+    <aside class="demo-card" aria-labelledby="demoTitle">
+      <h2 id="demoTitle">Demo account</h2>
+      <p>For judges and quick tries: a ready-made account with access to every feature. It sees the same generated demo data as everyone else.</p>
+      <dl>
+        <dt>Email</dt><dd>{{ demo_email }}</dd>
+        <dt>Password</dt><dd>{{ demo_password }}</dd>
+      </dl>
+      {% if mode == 'login' %}
+        <button type="button" class="btn" id="useDemo">Fill in the demo login</button>
+      {% else %}
+        <a class="btn" href="/login">Log in with the demo account</a>
+      {% endif %}
+    </aside>
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var b = document.getElementById('useDemo'); if (!b) return;
+  b.addEventListener('click', function () {
+    document.getElementById('email').value = {{ demo_email|tojson }};
+    document.getElementById('password').value = {{ demo_password|tojson }};
+    document.querySelector('#authForm button[type=submit]').focus();
+  });
+})();
+</script>
+{% endblock %}

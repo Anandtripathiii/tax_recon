@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Contact · Tax Reconciliation{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1><span class="accent">Contact</span></h1>
+  <p>Questions, bug reports and feedback go to the project's GitHub issues, where Team Fourier tracks them and everyone can see the answer.</p>
+</div>
+<form class="ask-form" id="contactForm" style="max-width: 46rem;">
+  <label class="fld"><span>Subject</span><input type="text" id="cSubject" maxlength="120" required placeholder="e.g. Fuzzy match missed a payment"></label>
+  <label class="fld"><span>Message</span><textarea id="cBody" required placeholder="What happened, and what you expected"></textarea></label>
+  <button type="submit">Open as a GitHub issue <svg class="ico" aria-hidden="true"><use href="#i-ext"/></svg></button>
+</form>
+<p class="note">This opens a new issue on GitHub in a new tab, prefilled with your text, so you can review it before posting. You need a GitHub account to post.</p>
+<div class="facts" style="margin-top:2rem;">
+  <div class="fact"><b>Issues</b><p><a href="https://github.com/Anandtripathiii/tax_recon/issues" target="_blank" rel="noopener">github.com/Anandtripathiii/tax_recon/issues</a></p></div>
+  <div class="fact"><b>Questions about your data</b><p>For questions about a run (flags, GST, what to fix), use <a href="/?tab=query#dashboard">Ask the Ledger</a> in the dashboard.</p></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('contactForm').addEventListener('submit', function (e) {
+  e.preventDefault();
+  var t = document.getElementById('cSubject').value.trim(), b = document.getElementById('cBody').value.trim();
+  if (!t || !b) return;
+  window.open('https://github.com/Anandtripathiii/tax_recon/issues/new?title=' + encodeURIComponent(t) + '&body=' + encodeURIComponent(b), '_blank', 'noopener');
+});
+</script>
+{% endblock %}
