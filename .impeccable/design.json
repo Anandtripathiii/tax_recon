@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-10T07:41:18+00:00",
+  "generatedAt": "2026-10-10T19:20:33+00:00",
   "title": "Design System: Tax Reconciliation",
   "extensions": {
     "colorMeta": {
@@ -486,6 +486,11 @@
       {
         "name": "The Exhibit Rule",
         "body": "A blue offset shadow belongs to exactly one featured piece of evidence per view. Everything else casts ink.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Slide Rule",
+        "body": "Moving between pages pushes the tab content sideways: forward slides the old panel out left and the new one in from the right; back reverses it. 0.35s, cubic-bezier(0.32, 0.72, 0, 1), horizontal only. The header, run controls and tabs never move. Cross-document View Transitions where the browser supports them, GSAP otherwise; off under reduced motion. An arriving panel skips its settle reveals so there is only one motion.",
         "section": "elevation"
       },
       {
