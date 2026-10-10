@@ -311,9 +311,10 @@ td.why { color: var(--ink-soft); min-width: 18rem; }
 .ring .track { fill: none; stroke: var(--rule); }
 .ring .fill { fill: none; stroke: var(--blue); stroke-linecap: butt; }
 .ring.fail .fill { stroke: var(--fail); }
+html.motion .ring .fill { stroke-dashoffset: var(--c); } /* start empty; GSAP fills to the score */
 .ring .score { position: absolute; inset: 0; display: grid; place-content: center; text-align: center;
   font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
-.ring .score b { font-size: 1.9rem; letter-spacing: -0.02em; }
+.ring .score b { font-size: 1.65rem; letter-spacing: -0.02em; }
 .ring.big .score b { font-size: 2.8rem; }
 .ring .score small { font-size: .68rem; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; color: var(--muted); margin-top: .35rem; }
 .verdict-chip { display: inline-flex; align-items: center; gap: .4rem; padding: .3rem .6rem; border: 2px solid var(--ink);
@@ -700,13 +701,13 @@ footer :focus-visible { outline-color: var(--fixed-link); }
           <circle class="track" cx="{{ r + sw }}" cy="{{ r + sw }}" r="{{ r }}" stroke-width="{{ sw }}"/>
           <circle class="fill" cx="{{ r + sw }}" cy="{{ r + sw }}" r="{{ r }}" stroke-width="{{ sw }}"
                   stroke-dasharray="{{ '%.2f'|format(c) }}" stroke-dashoffset="{{ '%.2f'|format(c * (1 - score / 100)) }}"
-                  data-circ="{{ '%.2f'|format(c) }}" data-score="{{ score }}"/>
+                  data-circ="{{ '%.2f'|format(c) }}" data-score="{{ score }}" style="--c: {{ '%.2f'|format(c) }}"/>
         </svg>
         <div class="score"><b>{{ '%.1f'|format(score) }}%</b><small>{{ 'Overall' if big else 'Clean' }}</small></div>
       </div>
     {%- endmacro %}
-    {% macro chip(passed) -%}
-      <span class="verdict-chip {{ 'pass' if passed else 'fail' }}"><svg class="ico" aria-hidden="true"><use href="#{{ 'i-check' if passed else 'i-close' }}"/></svg>{{ 'Pass' if passed else 'Fail' }}</span>
+    {% macro chip(passed, text='') -%}
+      <span class="verdict-chip {{ 'pass' if passed else 'fail' }}"><svg class="ico" aria-hidden="true"><use href="#{{ 'i-check' if passed else 'i-close' }}"/></svg>{{ text or ('Pass' if passed else 'Fail') }}</span>
     {%- endmacro %}
     <section class="verify-hero" data-reveal>
       {{ ring(verify.score, verify.all_pass, true, 'Overall verification score') }}
@@ -714,7 +715,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
         <h2>{% if verify.all_pass %}Reconciliation verified{% else %}{{ verify.passed }} of {{ verify.count }} checks pass{% endif %}</h2>
         <p>The overall score is the average of the {{ verify.count }} checks below, each computed from this run's invoices, bank payments, ledger and flags.</p>
         <p class="note" style="margin-top:.2rem;">A check passes when at least {{ '%.0f'|format(verify.materiality) }}% of its records are clean (the materiality threshold). Every exception is listed under Flagged records.</p>
-        <div style="margin-top:.6rem;">{{ chip(verify.all_pass) }}</div>
+        <div style="margin-top:.6rem;">{{ chip(verify.all_pass, 'All checks pass' if verify.all_pass else ((verify.count - verify.passed)|string + (' check fails' if verify.count - verify.passed == 1 else ' checks fail'))) }}</div>
       </div>
     </section>
     <div class="verify-grid">
