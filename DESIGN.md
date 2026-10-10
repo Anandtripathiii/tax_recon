@@ -260,6 +260,12 @@ The homepage's "What we do" is one ruled sheet split into three ledger columns b
 ### Verification rings
 A ring per check on the Verification tab: an 11px stroke on a Rule Grey track (14px for the overall ring), Audit Blue when the check passes and Fail red (#c8321f light, #ff6b57 dark) when it doesn't. The score sits in the middle in Figure type and never counts up; only the stroke fills (1.1s, power3.out, staggered). Below it is a Pass / Fail chip with a drawn icon, then the check name and a sentence of real counts. Fail red is a status colour only: it always comes with the icon and the word, and is never used as an accent. The overall ring sits in the one Exhibit sheet with the blue shadow.
 
+### Top menu
+Brand mark (an ink square with two blue rules) and three dropdown triggers: Product, Resources, Team. Each opens a full-width ink-edged panel with an 8px hard shadow: link cards on Ledger Paper (2px ink border, lift 2px with a blue shadow on hover) and a narrow aside with one call to action. Opens on click or hover, closes on Escape or a click outside. Log in / Sign up sit on the right; when logged in, the user's name (with a small blue square) and Log out. Under 900px the menu folds into a single Menu button.
+
+### Auth and the locked dashboard
+Log in and sign up use one ink-edged card beside a fixed-ink demo card that shows the demo email and password in mono. Logged out, the Ledger sheet shows a locked card (blue Exhibit shadow) with a one-click "Log in as demo" button. Errors are plain sentences in Fail red; confirmations use a blue-edged note.
+
 ### Loader
 A blurred paper veil (5px backdrop blur) behind a single white sheet with an 8px blue shadow, three pulsing blue squares, and "Running reconciliation · Checking invoices · bank · ledger".
 
