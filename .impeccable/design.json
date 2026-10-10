@@ -1,0 +1,513 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-10T07:41:18+00:00",
+  "title": "Design System: Tax Reconciliation",
+  "extensions": {
+    "colorMeta": {
+      "ledger-ink": {
+        "role": "neutral",
+        "displayName": "Ledger Ink",
+        "canonical": "#0a0a0f",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#252528",
+          "#414146",
+          "#606167",
+          "#818288",
+          "#a4a4aa",
+          "#c8c9cd",
+          "#eeeef1"
+        ]
+      },
+      "ink-soft": {
+        "role": "neutral",
+        "displayName": "Ink Soft",
+        "canonical": "#1f2028",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#242529",
+          "#414148",
+          "#5f6169",
+          "#80828b",
+          "#a3a4ac",
+          "#c8c9ce",
+          "#eeeef2"
+        ]
+      },
+      "graphite-muted": {
+        "role": "neutral",
+        "displayName": "Graphite Muted",
+        "canonical": "#5f6673",
+        "tonalRamp": [
+          "#090b0e",
+          "#22252b",
+          "#3d424b",
+          "#5b616d",
+          "#7c838f",
+          "#a0a5af",
+          "#c5c9d1",
+          "#eceff4"
+        ]
+      },
+      "audit-blue": {
+        "role": "primary",
+        "displayName": "Audit Blue",
+        "canonical": "#2d4bff",
+        "tonalRamp": [
+          "#02032f",
+          "#0a1666",
+          "#192da4",
+          "#2a47e5",
+          "#456fff",
+          "#719cff",
+          "#a1c5ff",
+          "#d4eeff"
+        ]
+      },
+      "audit-blue-deep": {
+        "role": "primary",
+        "displayName": "Audit Blue Deep",
+        "canonical": "#1930d9",
+        "tonalRamp": [
+          "#01042d",
+          "#091963",
+          "#17319e",
+          "#274cde",
+          "#4472ff",
+          "#719eff",
+          "#a2c6ff",
+          "#d5eeff"
+        ]
+      },
+      "ledger-paper": {
+        "role": "neutral",
+        "displayName": "Ledger Paper",
+        "canonical": "#eef1f7",
+        "tonalRamp": [
+          "#0a0b0c",
+          "#242527",
+          "#404245",
+          "#5f6166",
+          "#808287",
+          "#a3a5a9",
+          "#c8c9cc",
+          "#edeef0"
+        ]
+      },
+      "sheet-white": {
+        "role": "neutral",
+        "displayName": "Sheet White",
+        "canonical": "#ffffff",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#252525",
+          "#424242",
+          "#616161",
+          "#828282",
+          "#a5a5a5",
+          "#c9c9c9",
+          "#eeeeee"
+        ]
+      },
+      "rule-grey": {
+        "role": "neutral",
+        "displayName": "Rule Grey",
+        "canonical": "#d4d8e0",
+        "tonalRamp": [
+          "#0a0b0d",
+          "#232528",
+          "#404247",
+          "#5e6167",
+          "#7f8289",
+          "#a2a5aa",
+          "#c7c9cd",
+          "#edeef1"
+        ]
+      },
+      "night-ledger": {
+        "role": "neutral",
+        "displayName": "Night Ledger",
+        "canonical": "#0a0a10",
+        "tonalRamp": [
+          "#0b0b0d",
+          "#252528",
+          "#414147",
+          "#606068",
+          "#818189",
+          "#a4a4ab",
+          "#c8c9cd",
+          "#eeeef1"
+        ]
+      },
+      "night-sheet": {
+        "role": "neutral",
+        "displayName": "Night Sheet",
+        "canonical": "#15151e",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#24242a",
+          "#414149",
+          "#60606a",
+          "#81818c",
+          "#a4a4ad",
+          "#c8c8cf",
+          "#eeeef2"
+        ]
+      },
+      "night-card": {
+        "role": "neutral",
+        "displayName": "Night Card",
+        "canonical": "#1b1b26",
+        "tonalRamp": [
+          "#0b0b0e",
+          "#24242a",
+          "#41414a",
+          "#60606c",
+          "#81818e",
+          "#a4a4ae",
+          "#c8c8d0",
+          "#eeeef3"
+        ]
+      },
+      "night-ink-soft": {
+        "role": "neutral",
+        "displayName": "Night Ink Soft",
+        "canonical": "#e4e4e9",
+        "tonalRamp": [
+          "#0b0b0c",
+          "#252527",
+          "#424244",
+          "#616165",
+          "#828286",
+          "#a5a5a8",
+          "#c9c9cb",
+          "#eeeef0"
+        ]
+      },
+      "night-muted": {
+        "role": "neutral",
+        "displayName": "Night Muted",
+        "canonical": "#9ca3af",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#22252a",
+          "#3e4249",
+          "#5c626b",
+          "#7d838d",
+          "#a0a5ae",
+          "#c5c9d0",
+          "#eceff3"
+        ]
+      },
+      "night-blue": {
+        "role": "primary",
+        "displayName": "Night Blue",
+        "canonical": "#5b74ff",
+        "tonalRamp": [
+          "#040627",
+          "#141c58",
+          "#29358f",
+          "#3e50c9",
+          "#5c75f1",
+          "#849eff",
+          "#afc5ff",
+          "#ddedff"
+        ]
+      },
+      "night-blue-deep": {
+        "role": "primary",
+        "displayName": "Night Blue Deep",
+        "canonical": "#3a56ff",
+        "tonalRamp": [
+          "#02042d",
+          "#0e1863",
+          "#1f2f9e",
+          "#3149de",
+          "#4d70ff",
+          "#779cff",
+          "#a6c5ff",
+          "#d7edff"
+        ]
+      },
+      "night-rule": {
+        "role": "neutral",
+        "displayName": "Night Rule",
+        "canonical": "#2a2a38",
+        "tonalRamp": [
+          "#0b0b0f",
+          "#24242b",
+          "#41414c",
+          "#5f606e",
+          "#808190",
+          "#a3a4b0",
+          "#c8c8d2",
+          "#eeeef4"
+        ]
+      },
+      "chart-orange": {
+        "role": "secondary",
+        "displayName": "Chart Orange",
+        "canonical": "#eb6834",
+        "tonalRamp": [
+          "#1e0100",
+          "#470e00",
+          "#752100",
+          "#a73600",
+          "#ce5a2c",
+          "#e78966",
+          "#fdb59c",
+          "#ffe2d1"
+        ]
+      },
+      "chart-quiet": {
+        "role": "neutral",
+        "displayName": "Chart Quiet",
+        "canonical": "#c3c8d4",
+        "tonalRamp": [
+          "#0a0b0e",
+          "#23252a",
+          "#3f4249",
+          "#5d616b",
+          "#7e828c",
+          "#a1a5ad",
+          "#c6c9cf",
+          "#edeef2"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Hero title only, uppercase."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Homepage section titles, last word in Audit Blue."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Card titles, dashboard brand, in-tab subheadings."
+      },
+      "figure": {
+        "displayName": "Figure",
+        "purpose": "KPI values and source-panel amounts, tabular numerals."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Descriptions, notes, table cells."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase labels, table headers, tabs and buttons."
+      },
+      "data-mono": {
+        "displayName": "Data Mono",
+        "purpose": "Numeric inputs and bank narration strings only."
+      }
+    },
+    "shadows": [
+      {
+        "name": "sheet",
+        "value": "4px 4px 0 var(--ink)",
+        "purpose": "KPI tiles, chart cards, scrolling tables."
+      },
+      {
+        "name": "raised-sheet",
+        "value": "6px 6px 0 var(--ink)",
+        "purpose": "Feature/proof cards, hero buttons."
+      },
+      {
+        "name": "lifted",
+        "value": "8px 8px 0 var(--ink)",
+        "purpose": "Hover state, paired with translate(-2px,-2px)."
+      },
+      {
+        "name": "pressed",
+        "value": "2px 2px 0 var(--ink)",
+        "purpose": "Active state, paired with translate(2px,2px)."
+      },
+      {
+        "name": "exhibit",
+        "value": "6px 6px 0 var(--blue)",
+        "purpose": "The one featured piece of evidence per view; the loader uses an 8px variant."
+      },
+      {
+        "name": "focus-offset",
+        "value": "4px 4px 0 var(--blue)",
+        "purpose": "Focus treatment, paired with a blue border."
+      }
+    ],
+    "motion": [
+      {
+        "name": "press",
+        "value": "transform .12s ease, box-shadow .12s ease",
+        "purpose": "Lift on hover, press on click for shadowed sheets."
+      },
+      {
+        "name": "ink-pulse",
+        "value": "1.1s ease-in-out infinite, 0.18s stagger",
+        "purpose": "Loader squares pulse while reconciling."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "stack",
+        "value": "900px"
+      },
+      {
+        "name": "container",
+        "value": "1300px"
+      }
+    ],
+    "texture": {
+      "name": "graph-paper",
+      "value": "60px grid, 1px rgba(45,75,255,0.05) light / rgba(91,116,255,0.07) dark",
+      "purpose": "Page ground."
+    },
+    "chartSeries": [
+      "#2d4bff",
+      "#eb6834",
+      "#1baf7a",
+      "#eda100",
+      "#e87ba4",
+      "#008300",
+      "#6250d6",
+      "#e34948"
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Hero and main call to action; lifts on hover, presses on click.",
+      "html": "<button class=\"ds-btn-primary\">Open Dashboard →</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:.5rem;padding:1rem 1.8rem;background:#2d4bff;color:#fff;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:1px;text-transform:uppercase;border:2px solid #0a0a0f;border-radius:0;box-shadow:6px 6px 0 #0a0a0f;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;}.ds-btn-primary:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 #0a0a0f;}.ds-btn-primary:active{transform:translate(2px,2px);box-shadow:2px 2px 0 #0a0a0f;}.ds-btn-primary:focus-visible{outline:2px solid #2d4bff;outline-offset:4px;}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary hero action on a white sheet.",
+      "html": "<button class=\"ds-btn-outline\">See Accuracy</button>",
+      "css": ".ds-btn-outline{display:inline-flex;align-items:center;padding:1rem 1.8rem;background:#fff;color:#0a0a0f;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.95rem;letter-spacing:1px;text-transform:uppercase;border:2px solid #0a0a0f;border-radius:0;box-shadow:6px 6px 0 #0a0a0f;cursor:pointer;transition:transform .12s ease,box-shadow .12s ease;}.ds-btn-outline:hover{transform:translate(-2px,-2px);box-shadow:8px 8px 0 #0a0a0f;}.ds-btn-outline:active{transform:translate(2px,2px);box-shadow:2px 2px 0 #0a0a0f;}.ds-btn-outline:focus-visible{outline:2px solid #2d4bff;outline-offset:4px;}"
+    },
+    {
+      "name": "Toolbar Button",
+      "kind": "button",
+      "refersTo": "button-toolbar",
+      "description": "Compact dashboard actions (Excel, CSV, Clear); fills blue on hover.",
+      "html": "<button class=\"ds-btn-toolbar\">⤓ Excel</button>",
+      "css": ".ds-btn-toolbar{display:inline-flex;align-items:center;gap:.4rem;padding:.6rem 1rem;background:#fff;color:#0a0a0f;border:2px solid #0a0a0f;border-radius:0;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:.82rem;letter-spacing:1px;text-transform:uppercase;cursor:pointer;}.ds-btn-toolbar:hover{background:#2d4bff;color:#fff;}.ds-btn-toolbar:focus-visible{outline:2px solid #2d4bff;outline-offset:3px;}"
+    },
+    {
+      "name": "Number Input",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Run parameter field with stacked uppercase label and mono digits.",
+      "html": "<label class=\"ds-field\">Invoices<input class=\"ds-input-num\" type=\"number\" value=\"3000\"></label>",
+      "css": ".ds-field{display:inline-flex;flex-direction:column;gap:.3rem;color:#5f6673;font-family:Inter,sans-serif;font-size:.72rem;font-weight:600;letter-spacing:1px;text-transform:uppercase;}.ds-input-num{width:100px;padding:.55rem .7rem;background:#eef1f7;color:#0a0a0f;border:2px solid #0a0a0f;border-radius:0;font-family:'JetBrains Mono',monospace;font-size:.95rem;text-align:center;-moz-appearance:textfield;}.ds-input-num:focus-visible{outline:none;border-color:#2d4bff;box-shadow:4px 4px 0 #2d4bff;}"
+    },
+    {
+      "name": "Folder Tabs",
+      "kind": "nav",
+      "refersTo": "",
+      "description": "Dashboard tab strip; the active tab is a white folder tab on the ink rule.",
+      "html": "<nav class=\"ds-tabs\"><a class=\"ds-tab ds-tab-active\" href=\"#\">Summary</a><a class=\"ds-tab\" href=\"#\">Flagged records</a><a class=\"ds-tab\" href=\"#\">Accuracy</a></nav>",
+      "css": ".ds-tabs{display:flex;flex-wrap:wrap;border-bottom:2px solid #0a0a0f;}.ds-tab{padding:.9rem 1.4rem;color:#0a0a0f;text-decoration:none;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:.9rem;letter-spacing:.5px;text-transform:uppercase;border:2px solid transparent;border-bottom:none;margin-bottom:-2px;margin-right:.2rem;}.ds-tab:hover{color:#2d4bff;}.ds-tab:focus-visible{outline:2px solid #2d4bff;outline-offset:-4px;}.ds-tab-active{background:#fff;border-color:#0a0a0f;}"
+    },
+    {
+      "name": "KPI Tile",
+      "kind": "card",
+      "refersTo": "card-sheet",
+      "description": "Headline figure on a white ink-edged sheet.",
+      "html": "<div class=\"ds-kpi\"><div class=\"ds-kpi-label\">Discrepancies</div><div class=\"ds-kpi-value\">180</div></div>",
+      "css": ".ds-kpi{width:200px;background:#fff;border:2px solid #0a0a0f;padding:1rem 1.1rem;box-shadow:4px 4px 0 #0a0a0f;}.ds-kpi-label{font-family:Inter,sans-serif;font-size:.72rem;color:#5f6673;font-weight:600;text-transform:uppercase;letter-spacing:1px;}.ds-kpi-value{font-family:'Space Grotesk',sans-serif;font-size:1.75rem;font-weight:700;color:#0a0a0f;margin-top:.3rem;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}"
+    },
+    {
+      "name": "Ledger Table",
+      "kind": "custom",
+      "refersTo": "table-head",
+      "description": "Ink-headed table with grey row rules and tabular numerals.",
+      "html": "<table class=\"ds-table\"><thead><tr><th>Problem</th><th>Invoice</th><th>Total</th></tr></thead><tbody><tr><td>Wrong GST</td><td>INV-1029</td><td>₹55,835</td></tr><tr><td>Duplicate invoice</td><td>INV-2214</td><td>₹1.24 L</td></tr></tbody></table>",
+      "css": ".ds-table{border-collapse:collapse;background:#fff;border:2px solid #0a0a0f;font-family:Inter,sans-serif;font-size:.9rem;}.ds-table th,.ds-table td{padding:.55rem .7rem;border-bottom:1px solid #d4d8e0;text-align:left;font-variant-numeric:tabular-nums;color:#0a0a0f;}.ds-table th{background:#0a0a0f;color:#eef1f7;font-family:'Space Grotesk',sans-serif;font-weight:600;text-transform:uppercase;letter-spacing:1px;font-size:.75rem;}.ds-table tbody tr:hover td{background:rgba(45,75,255,.04);}"
+    },
+    {
+      "name": "Example Exhibit",
+      "kind": "custom",
+      "refersTo": "verdict-bar",
+      "description": "Signature evidence card: source panel plus ink verdict bar, with the blue Exhibit shadow.",
+      "html": "<div class=\"ds-exhibit\"><div class=\"ds-src\"><div class=\"ds-src-label\">Invoice</div><div class=\"ds-src-big\">INV-1029</div><div>GST @ <span class=\"ds-hl\">18%</span> · Tax <span class=\"ds-hl\">₹12,214</span></div></div><div class=\"ds-verdict\"><strong>Flagged — wrong GST:</strong> tax should have been ₹7,852.</div></div>",
+      "css": ".ds-exhibit{max-width:420px;background:#fff;border:2px solid #0a0a0f;padding:1.4rem 1.6rem;box-shadow:6px 6px 0 #2d4bff;font-family:Inter,sans-serif;color:#0a0a0f;font-size:.88rem;}.ds-src{border:2px solid #0a0a0f;padding:.85rem 1rem;background:#eef1f7;}.ds-src-label{color:#2d4bff;font-family:'Space Grotesk',sans-serif;font-size:.72rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:.5rem;}.ds-src-big{font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:700;margin-bottom:.4rem;font-variant-numeric:tabular-nums;}.ds-hl{color:#2d4bff;font-weight:700;}.ds-verdict{margin-top:.9rem;padding:.7rem 1rem;background:#0a0a0f;color:#eef1f7;font-weight:500;}.ds-verdict strong{color:#fff;}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Audit Ledger",
+    "overview": "The interface is a CA's ruled working paper with the volume turned up. A faint blue graph-paper grid runs behind everything. Each record sits on its own white sheet, edged in 2px of black ink, and a hard offset shadow pins the sheet to the desk. Nothing is soft, rounded or blurred: findings have edges because they are evidence, and evidence should look like it can be put on the table.\n\nIt is **confident but exact**. The type is loud (uppercase Space Grotesk, tight tracking) and the shadows are graphic, but the system stays disciplined: one accent colour, square corners everywhere, tabular numerals, one consistent border weight. Boldness carries hierarchy and proof. It never stands in for content. Dashboard density stays practical: KPI tiles, charts and tables sit close together, so a CA can scan a whole run without hunting.\n\nThere are two themes, light and dark. Dark swaps the paper for a near-black ledger and brightens the blue, but keeps the same ink-edged sheets and hard shadows.",
+    "keyCharacteristics": [
+      "2px solid ink borders on every container, input and button",
+      "Hard offset shadows with zero blur (4/6/8px), which collapse when pressed",
+      "Square corners only (0px radius)",
+      "One accent: Audit Blue, reserved for primary action, emphasis and the leading data series",
+      "Uppercase Space Grotesk for headings, labels and buttons; Inter for reading text; JetBrains Mono for numeric entry and bank narrations",
+      "A 60px blue graph-paper grid as the page ground"
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "Audit Blue is the only accent in the UI chrome. The chart categorical palette exists only inside plots and never spills into buttons, badges or text.",
+        "section": "colors"
+      },
+      {
+        "name": "The Fixed Ink Rule",
+        "body": "The verdict bar and the footer are always Ledger Ink with white text, in both themes (`--fixed-ink`, `--fixed-paper`, and `--fixed-link` #5b74ff for links on ink). They never follow the theme's `--ink`, which turns white in dark mode.",
+        "section": "colors"
+      },
+      {
+        "name": "The Ink Is Structure Rule",
+        "body": "Every edge is Ledger Ink at 2px. Rule Grey is allowed only for row dividers inside a table that already has an ink frame.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Numbers Rule",
+        "body": "Every rupee amount, count and percentage uses tabular numerals (`font-variant-numeric: tabular-nums`) so columns line up like a ledger.",
+        "section": "typography"
+      },
+      {
+        "name": "The Uppercase Is Structure Rule",
+        "body": "Uppercase belongs to headings, labels, tabs and buttons. Sentences, notes, table data and the verdict text stay in sentence case.",
+        "section": "typography"
+      },
+      {
+        "name": "The Physical Press Rule",
+        "body": "Interactive sheets lift up-left on hover and press down-right on click, so the shadow always grows or shrinks with the motion. Transitions run 0.12s ease on transform and box-shadow only.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Exhibit Rule",
+        "body": "A blue offset shadow belongs to exactly one featured piece of evidence per view. Everything else casts ink.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Settle Rule",
+        "body": "Motion (GSAP + ScrollTrigger) reveals sheets as if they are set down on the desk. Each sheet starts 6px up-left with its shadow 6px longer, then settles to its resting offset (0.5s, power3.out, staggered 0.06s). Sheets reveal once, as they enter the viewport. The hero title rises out of its ruled lines once on load; the verdict bar wipes in left to right after its card settles. Numbers never animate (no count-ups). Everything stays visible without JavaScript, and with reduced motion nothing moves.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** give every new container a 2px Ledger Ink border, square corners and an offset shadow from the vocabulary (4/6/8px, zero blur).",
+      "**Do** keep Audit Blue as the single UI accent, and use it to mark the one value or action that matters in each group.",
+      "**Do** set every amount, count and percentage in tabular numerals, and format rupees Indian-style (₹ L / Cr).",
+      "**Do** keep chart cards Sheet White in both themes and draw plots from the `SERIES` order in `app.py`, blue first.",
+      "**Do** pair lift-on-hover with press-on-click for any button or card that casts a shadow."
+    ],
+    "donts": [
+      "**Don't** round corners or blur shadows. A soft drop shadow breaks the cut-sheet world.",
+      "**Don't** bring back the retired brown, paper and Georgia-serif palette anywhere, including charts, favicon or exports.",
+      "**Don't** use chart categorical colours (orange, aqua, yellow …) for UI chrome, badges or text.",
+      "**Don't** set sentences, notes or table data in uppercase.",
+      "**Don't** ship focus states as browser defaults. Fields take the blue border plus 4px blue offset; everything else takes the 2px blue outline.",
+      "**Don't** use emoji or Unicode glyphs as icons, or animate numbers."
+    ]
+  }
+}

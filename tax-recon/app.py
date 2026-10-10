@@ -16,21 +16,25 @@ import plotly.express as px
 import plotly.graph_objects as go
 from flask import Flask, Response, abort, render_template, request, send_file
 
-from engine import evaluate, run_all, to_excel
+from engine import LEDGER_LATE_DAYS, PAY_LATE_DAYS, evaluate, run_all, to_excel
 from generator import make_data
 
-PAPER = ["#8B4513", "#C9A66B", "#6B8E23", "#A0522D", "#B8860B", "#704214", "#5F7A3D", "#8B7355"]
+# Audit Ledger chart palette: brand blue first, then a CVD-validated categorical order.
+# Charts always sit on a white card (both themes), so only the light steps are needed.
+INK, BLUE, ORANGE, QUIET = "#0a0a0f", "#2d4bff", "#eb6834", "#c3c8d4"
+SERIES = [BLUE, ORANGE, "#1baf7a", "#eda100", "#e87ba4", "#008300", "#6250d6", "#e34948"]
 LABELS = {"amount_mismatch": "Amount mismatch", "duplicate": "Duplicate invoice", "wrong_gst": "Wrong GST",
           "missing_payment": "Missing payment", "missing_ledger": "Missing ledger entry",
           "date_shift": "Date shift", "orphan_payment": "Payment with no invoice",
           "anomalous_amount": "Unusual amount (ML)"}
 TEMPLATE = {"layout": dict(
-    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(245,239,224,0.4)",
-    font=dict(family="Georgia, serif", color="#2B2118", size=13),
-    title=dict(font=dict(family="Georgia, serif", size=15, color="#2B2118")),
-    xaxis=dict(gridcolor="rgba(139,69,19,0.12)", linecolor="#8B4513"),
-    yaxis=dict(gridcolor="rgba(139,69,19,0.12)", linecolor="#8B4513"),
-    colorway=PAPER, margin=dict(l=50, r=20, t=50, b=50), height=380)}
+    paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="#ffffff",
+    font=dict(family="Inter, -apple-system, 'Segoe UI', sans-serif", color=INK, size=13),
+    title=dict(font=dict(family="'Space Grotesk', sans-serif", size=15, color=INK)),
+    xaxis=dict(gridcolor="rgba(10,10,15,0.08)", linecolor=INK, zerolinecolor="rgba(10,10,15,0.25)"),
+    yaxis=dict(gridcolor="rgba(10,10,15,0.08)", linecolor=INK, zerolinecolor="rgba(10,10,15,0.25)"),
+    hoverlabel=dict(bgcolor=INK, bordercolor=INK, font=dict(family="Inter, sans-serif", color="#ffffff")),
+    colorway=SERIES, margin=dict(l=50, r=20, t=50, b=50), height=380)}
 
 
 def fig(f):
@@ -55,6 +59,7 @@ def rs(x):
 
 _cache = {}
 _lock = threading.Lock()
+_compute_lock = threading.Lock()
 
 
 def compute(n, rate, seed, with_baseline=False):
@@ -65,15 +70,21 @@ def compute(n, rate, seed, with_baseline=False):
     with _lock:
         entry = _cache.get(key)
     if entry is None:
-        t0 = time.time()
-        d = make_data(n, rate, seed)
-        res = run_all(d["invoices"], d["bank"], d["ledger"])
-        ev = evaluate(d["truth"], res)
-        elapsed = time.time() - t0
-        entry = {"d": d, "res": res, "ev": ev, "ev_base": None, "elapsed": elapsed}
-        with _lock:
-            _cache.clear()
-            _cache[key] = entry
+        # One run at a time: a second caller (e.g. the startup warmup) waits and reuses the
+        # result instead of competing for CPU, which also keeps the measured time honest.
+        with _compute_lock:
+            with _lock:
+                entry = _cache.get(key)
+            if entry is None:
+                t0 = time.time()
+                d = make_data(n, rate, seed)
+                res = run_all(d["invoices"], d["bank"], d["ledger"])
+                ev = evaluate(d["truth"], res)
+                elapsed = time.time() - t0
+                entry = {"d": d, "res": res, "ev": ev, "ev_base": None, "elapsed": elapsed}
+                with _lock:
+                    _cache.clear()
+                    _cache[key] = entry
     if with_baseline and entry["ev_base"] is None:
         d = entry["d"]
         base = run_all(d["invoices"], d["bank"], d["ledger"], fuzzy=False)
@@ -84,12 +95,51 @@ def compute(n, rate, seed, with_baseline=False):
 def _warmup():
     """Precompute the default run at startup so the first visitor sees results instantly."""
     try:
+        # A small throwaway run first pays one-time library start-up costs (worker pools,
+        # imports), so the default run's measured time reflects the reconciliation itself.
+        d = make_data(500, 0.10, 1)
+        evaluate(d["truth"], run_all(d["invoices"], d["bank"], d["ledger"]))
         compute(3000, 0.10, 42, with_baseline=False)
     except Exception:
         pass
 
 
 threading.Thread(target=_warmup, daemon=True).start()
+
+
+def evidence(r, orphan_amt):
+    """Expected value, found value and rupees at stake for one flag, so every row explains itself."""
+    t = r.error_type
+    if t == "wrong_gst":
+        return f"Tax {rs(r.expected_tax)}", f"Tax {rs(r.tax_amount)}", abs(r.tax_amount - r.expected_tax)
+    if t == "amount_mismatch":
+        gaps = {"Bank": r.bank_amount, "Ledger": r.led_amount}
+        src, val = max(gaps.items(), key=lambda kv: abs((kv[1] if pd.notna(kv[1]) else r.total) - r.total))
+        return f"{rs(r.total)} in all three", f"{src} {rs(val)}", abs(val - r.total)
+    if t == "missing_payment":
+        return f"Payment of {rs(r.total)}", "No bank payment", r.total
+    if t == "missing_ledger":
+        return f"Ledger entry of {rs(r.total)}", "No ledger entry", r.total
+    if t == "duplicate":
+        return "One invoice", "A second copy", r.total
+    if t == "date_shift":
+        if pd.notna(r.bank_lag) and r.bank_lag > PAY_LATE_DAYS:
+            return f"Paid within {PAY_LATE_DAYS} days", f"Paid after {r.bank_lag:.0f} days", float("nan")
+        return f"Booked within {LEDGER_LATE_DAYS} days", f"Booked after {r.led_lag:.0f} days", float("nan")
+    if t == "orphan_payment":
+        amt = orphan_amt.get(r.key, float("nan"))
+        return "A matching invoice", f"Payment of {rs(amt)}", amt
+    return "", "", float("nan")
+
+
+def live_proof(res, ev, elapsed):
+    """Homepage proof figures, taken from the current run instead of typed-in text."""
+    g = ev[ev.error_type == "wrong_gst"]
+    ml = ev[ev.error_type == "anomalous_amount"]
+    return {"invoices": f"{len(res['inv']):,}", "seconds": f"{elapsed:.1f}",
+            "gst_precision": f"{g.precision.iloc[0] * 100:.0f}%" if len(g) else "—",
+            "gst_recall": f"{g.recall.iloc[0] * 100:.0f}%" if len(g) else "—",
+            "ml_precision": f"{ml.precision.iloc[0] * 100:.0f}%" if len(ml) else "—"}
 
 
 def pick_example(res, truth):
@@ -132,12 +182,12 @@ def _plotly():
 @app.route("/favicon.ico")
 def _favicon():
     svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">'
-           '<rect width="64" height="64" fill="#F5EFE0"/>'
-           '<path d="M14 12 h32 l6 8 v32 a4 4 0 0 1 -4 4 h-30 a4 4 0 0 1 -4 -4 z" fill="#FFFAEB" stroke="#8B4513" stroke-width="2.5"/>'
-           '<path d="M46 12 v8 h6" fill="none" stroke="#8B4513" stroke-width="2.5" stroke-linejoin="round"/>'
-           '<line x1="20" y1="28" x2="44" y2="28" stroke="#8B4513" stroke-width="2"/>'
-           '<line x1="20" y1="36" x2="44" y2="36" stroke="#8B4513" stroke-width="2"/>'
-           '<line x1="20" y1="44" x2="36" y2="44" stroke="#8B4513" stroke-width="2"/>'
+           '<rect width="64" height="64" fill="#0a0a0f"/>'
+           '<path d="M14 10 h28 l8 8 v36 h-36 z" fill="#ffffff"/>'
+           '<path d="M42 10 v8 h8" fill="none" stroke="#0a0a0f" stroke-width="2.5"/>'
+           '<line x1="20" y1="28" x2="44" y2="28" stroke="#2d4bff" stroke-width="3"/>'
+           '<line x1="20" y1="36" x2="44" y2="36" stroke="#2d4bff" stroke-width="3"/>'
+           '<line x1="20" y1="44" x2="34" y2="44" stroke="#2d4bff" stroke-width="3"/>'
            '</svg>')
     return Response(svg, mimetype="image/svg+xml")
 
@@ -149,14 +199,14 @@ def index():
     seed = request.args.get("seed", 42, type=int)
     active = request.args.get("tab", "summary")
 
+    res, ev, ev_base, elapsed, truth = compute(n, rate, seed, with_baseline=(active == "accuracy"))
+    proof = live_proof(res, ev, elapsed)
     if active == "query":
         return render_template("index.html", active="query", n=n, rate=int(rate * 100), seed=seed,
-                               kpis=[], tax_kpis=[], flagged=[], monthly=[], anomaly_tbl=[],
-                               acc_tbl=[], cmp_tbl=[], kinds=["All"], kind="All", q="",
+                               proof=proof, kpis=[], tax_kpis=[], flagged=[], monthly=[], anomaly_tbl=[],
+                               acc_tbl=[], cmp_rows=[], kinds=["All"], kind="All", q="",
                                donut=None, bars=None, gst=None, hist=None, scat=None, accuracy=None,
-                               fuzzy_count=0, elapsed=0, example=None, total_filtered=0)
-
-    res, ev, ev_base, elapsed, truth = compute(n, rate, seed, with_baseline=(active == "accuracy"))
+                               fuzzy_count=0, example=None, total_filtered=0)
     inv, flags, lia = res["inv"], res["flags"], res["liability"]
     status = inv.status.value_counts()
     orphans = len(res["orphans"])
@@ -169,16 +219,19 @@ def index():
 
     # Pie chart with outside labels so slices don't overlap
     donut_fig = px.pie(status.reset_index(), names="status", values="count", hole=.55,
-                      color_discrete_sequence=PAPER, title="Invoices by status")
+                      color_discrete_sequence=SERIES, title="Invoices by status")
     donut_fig.update_traces(textposition="outside", textinfo="label+percent",
-                           pull=[0.02] * len(status))
+                           pull=[0.02] * len(status), rotation=180,  # small slices sit at the bottom, clear of the title
+                           marker=dict(line=dict(color="#ffffff", width=2)))
+    donut_fig.update_layout(showlegend=False, margin=dict(l=40, r=40, t=100, b=40),
+                            title=dict(x=0.02, y=0.97, yanchor="top"))
     donut = fig(donut_fig)
 
     by = flags.error_type.map(LABELS).value_counts().reset_index()
     if by.empty:
         by = pd.DataFrame({"error_type": ["(none)"], "count": [0]})
     bars = fig(px.bar(by, x="count", y="error_type", orientation="h",
-                      color_discrete_sequence=PAPER, title="Problems found, by type",
+                      color_discrete_sequence=[BLUE], title="Problems found, by type",
                       labels={"count": "Records", "error_type": ""}
                       ).update_layout(yaxis=dict(categoryorder="total ascending")))
 
@@ -194,8 +247,14 @@ def index():
     kind = request.args.get("kind", "All")
     q = (request.args.get("q", "") or "").strip()
     t = flags.assign(problem=flags.error_type.map(LABELS))
-    t = t.merge(inv[["row_id", "invoice_id", "party", "date", "total"]],
+    t = t.merge(inv[["row_id", "invoice_id", "party", "date", "total", "tax_amount", "expected_tax",
+                     "bank_amount", "led_amount", "bank_lag", "led_lag"]],
                 left_on="key", right_on="row_id", how="left")
+    orphan_amt = res["bank"].set_index("txn_id").amount
+    ev_cols = t.apply(lambda r: pd.Series(evidence(r, orphan_amt), index=["expected", "found", "stake"]),
+                      axis=1) if len(t) else pd.DataFrame(columns=["expected", "found", "stake"])
+    t = t.join(ev_cols)
+    t["detail"] = t.detail.str.replace("Rs ", "₹", regex=False)
     if kind != "All":
         t = t[t.problem == kind]
     if q:
@@ -203,21 +262,26 @@ def index():
         mask = hay.apply(lambda c: c.str.contains(q, case=False, na=False)).any(axis=1)
         t = t[mask]
     total_filtered = len(t)
-    t = t.sort_values("problem").head(500).copy()
-    t["date"] = pd.to_datetime(t["date"], errors="coerce").dt.strftime("%Y-%m-%d").fillna("")
-    t["total"] = t["total"].apply(rs)
-    flagged = tbl(t, ["problem", "invoice_id", "key", "party", "date", "total", "detail"],
-                  {"problem": "Problem", "invoice_id": "Invoice", "key": "Record", "party": "Party",
-                   "date": "Date", "total": "Total", "detail": "Why it was flagged"})
+    t = t.sort_values(["stake", "problem"], ascending=[False, True], na_position="last").head(500).copy()
+    t["date"] = pd.to_datetime(t["date"], errors="coerce").dt.strftime("%d %b %Y").fillna("")
+    t["invoice_id"] = t.invoice_id.fillna(t.key)
+    t["party"] = t.party.fillna("Unknown (bank only)")
+    t["stake"] = t.stake.apply(lambda x: rs(x) if pd.notna(x) else "")
+    flagged = tbl(t, ["problem", "invoice_id", "party", "date", "expected", "found", "stake", "detail"],
+                  {"problem": "Problem", "invoice_id": "Invoice / payment", "party": "Party",
+                   "date": "Date", "expected": "Expected", "found": "Found", "stake": "₹ at stake",
+                   "detail": "Why it was flagged"})
 
     m = lia["monthly"]
     gst_fig = go.Figure()
-    gst_fig.add_bar(x=m.month, y=m.output_tax, name="Output tax (sales)", marker_color=PAPER[0])
-    gst_fig.add_bar(x=m.month, y=m.itc, name="Input tax credit (purchases)", marker_color=PAPER[1])
-    gst_fig.add_scatter(x=m.month, y=m.net_clean, name="Net liability",
-                        line=dict(color="#2B2118", width=2))
+    lakh = lambda v: (v / 1e5).round(2)
+    gst_fig.add_bar(x=m.month, y=lakh(m.output_tax), name="Output tax (sales)", marker_color=BLUE)
+    gst_fig.add_bar(x=m.month, y=lakh(m.itc), name="Input tax credit (purchases)", marker_color=ORANGE)
+    gst_fig.add_scatter(x=m.month, y=lakh(m.net_clean), name="Net liability",
+                        line=dict(color=INK, width=2), marker=dict(size=8))
     gst_fig.update_layout(barmode="group", title="Monthly GST from clean records",
-                          yaxis_title="Rupees", legend=dict(orientation="h", y=-0.2))
+                          yaxis_title="₹ Lakh", legend=dict(orientation="h", y=-0.28, x=0),
+                          margin=dict(l=60, r=20, t=50, b=90), height=420)
     gst = fig(gst_fig)
     monthly = tbl(m.round(0).assign(
         output_tax=m.output_tax.apply(rs), itc=m.itc.apply(rs),
@@ -231,28 +295,37 @@ def index():
                 ("Tax gap on wrong-GST", rs((wrong.tax_amount - wrong.expected_tax).sum()))]
 
     hist = fig(px.histogram(inv, x="anomaly_score", nbins=40,
-                            color_discrete_sequence=[PAPER[0]],
-                            title="Anomaly score across all invoices"))
-    scat = fig(px.scatter(inv, x="log_amount", y="party_z", color="anomaly",
-                          color_discrete_sequence=["#C7B899", "#8B4513"],
+                            color_discrete_sequence=[BLUE],
+                            title="How unusual each invoice looks",
+                            labels={"anomaly_score": "Unusualness score (0 = typical, 1 = most unusual)"}
+                            ).update_layout(yaxis_title="Invoices"))
+    scat = fig(px.scatter(inv.assign(group=inv.anomaly.map({True: "Marked unusual", False: "Typical"})),
+                          x="log_amount", y="party_z", color="group",
+                          color_discrete_map={"Typical": QUIET, "Marked unusual": BLUE},
                           hover_data=["invoice_id", "party"],
-                          title="Amount vs. difference from the party's usual",
-                          labels={"log_amount": "log amount", "party_z": "distance from party average"}))
+                          title="Amount vs. this party's usual amount",
+                          labels={"log_amount": "Invoice size (log scale)",
+                                  "party_z": "Distance from party's average", "group": ""}
+                          ).update_layout(legend=dict(orientation="h", y=-0.25, x=0)))
     top = inv.sort_values("anomaly_score", ascending=False).head(25).copy()
-    top["date"] = top["date"].dt.strftime("%Y-%m-%d")
+    top["date"] = top["date"].dt.strftime("%d %b %Y")
+    top["why"] = top.party_z.apply(lambda z: f"{abs(z):.1f} std. dev. {'above' if z > 0 else 'below'} "
+                                             f"this party's usual amount")
+    top["issues"] = top.issues.apply(
+        lambda v: ", ".join(LABELS.get(c.strip(), c.strip()) for c in v.split(",") if c.strip()))
     top["total"] = top["total"].apply(rs)
     top["party_z"] = top["party_z"].round(2)
     top["anomaly_score"] = top["anomaly_score"].round(3)
-    anomaly_tbl = tbl(top, ["invoice_id", "party", "date", "total", "party_z", "anomaly_score", "issues"],
+    anomaly_tbl = tbl(top, ["invoice_id", "party", "date", "total", "why", "anomaly_score", "issues"],
                       {"invoice_id": "Invoice", "party": "Party", "date": "Date", "total": "Total",
-                       "party_z": "Party z-score", "anomaly_score": "Score", "issues": "Also flagged for"})
+                       "why": "What looks unusual", "anomaly_score": "Score", "issues": "Also flagged for"})
 
     e = ev.assign(error_type=ev.error_type.map(LABELS))
     acc_fig = go.Figure()
     acc_fig.add_bar(x=e.error_type, y=(e.precision * 100).round(1),
-                    name="Precision (%)", marker_color=PAPER[0])
+                    name="Precision (%)", marker_color=BLUE)
     acc_fig.add_bar(x=e.error_type, y=(e.recall * 100).round(1),
-                    name="Recall (%)", marker_color=PAPER[1])
+                    name="Recall (%)", marker_color=ORANGE)
     acc_fig.update_layout(barmode="group", title="Precision and recall per error type",
                           yaxis_title="%", legend=dict(orientation="h", y=-0.3),
                           xaxis=dict(tickangle=-25))
@@ -263,17 +336,17 @@ def index():
                   ["error_type", "planted", "flagged", "correct", "precision", "recall", "f1"],
                   {"error_type": "Error type", "planted": "Planted", "flagged": "Flagged",
                    "correct": "Correct", "precision": "Precision", "recall": "Recall", "f1": "F1"})
+    cmp_rows = []
     if ev_base is not None:
         cmp = ev[["error_type", "precision", "recall"]].merge(
-            ev_base[["error_type", "precision", "recall"]], on="error_type",
-            suffixes=(" (full)", " (exact only)"))
-    else:
-        cmp = ev[["error_type", "precision", "recall"]].rename(
-            columns={"precision": "precision (full)", "recall": "recall (full)"})
-        cmp["precision (exact only)"] = cmp["recall (exact only)"] = 0.0
-    cmp["error_type"] = cmp.error_type.map(LABELS)
-    cmp_tbl = tbl(cmp.assign(**{c: cmp[c].apply(pct) for c in cmp.columns if c != "error_type"}),
-                  rename={"error_type": "Error type"})
+            ev_base[["error_type", "precision", "recall"]], on="error_type", suffixes=("", "_base"))
+        for r in cmp.itertuples():
+            dp, dr = (r.precision - r.precision_base) * 100, (r.recall - r.recall_base) * 100
+            cmp_rows.append({"label": LABELS.get(r.error_type, r.error_type),
+                             "p0": pct(r.precision_base), "p1": pct(r.precision), "dp": dp,
+                             "r0": pct(r.recall_base), "r1": pct(r.recall), "dr": dr,
+                             "changed": abs(dp) >= 5 or abs(dr) >= 5})
+        cmp_rows.sort(key=lambda x: -max(abs(x["dp"]), abs(x["dr"])))
     kinds = ["All"] + sorted(set(flags.error_type.map(LABELS).dropna()))
     fuzzy_count = int((inv.match == "fuzzy").sum())
     example = pick_example(res, truth)
@@ -283,14 +356,14 @@ def index():
         kpis=kpis, donut=donut, bars=bars, flagged=flagged, total_filtered=total_filtered,
         kinds=kinds, kind=kind, q=q,
         tax_kpis=tax_kpis, gst=gst, monthly=monthly, hist=hist, scat=scat, anomaly_tbl=anomaly_tbl,
-        accuracy=accuracy, acc_tbl=acc_tbl, cmp_tbl=cmp_tbl, fuzzy_count=fuzzy_count,
-        elapsed=round(elapsed, 2), example=example, active=active)
+        accuracy=accuracy, acc_tbl=acc_tbl, cmp_rows=cmp_rows, fuzzy_count=fuzzy_count,
+        proof=proof, example=example, active=active)
 
 
 @app.route("/download/<kind>")
 def download(kind):
-    n = request.args.get("n", 3000, type=int)
-    rate = request.args.get("rate", 10, type=int) / 100
+    n = max(500, min(5000, request.args.get("n", 3000, type=int)))
+    rate = max(0.02, min(0.25, request.args.get("rate", 10, type=int) / 100))
     seed = request.args.get("seed", 42, type=int)
     res, _, _, _, _ = compute(n, rate, seed, with_baseline=False)
     if kind == "excel":
