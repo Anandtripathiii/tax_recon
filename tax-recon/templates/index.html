@@ -6,7 +6,7 @@
 <link rel="expect" href="#tab-panel-end" blocking="render">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script>
-/* Set the saved theme before first paint, and work out whether this page arrives with the cover effect. */
+/* Set the saved theme before first paint. */
 (function () {
   var root = document.documentElement;
   try { root.setAttribute('data-theme', localStorage.getItem('theme') || 'light'); } catch (e) {}
@@ -15,20 +15,7 @@
     root.classList.add('motion');
     setTimeout(function () { if (!window.gsap) root.classList.remove('motion'); }, 2500);
   }
-  /* Any move between pages of this site gets the same cover: the new tab content slides up over the old.
-     Cross-document View Transitions where supported; GSAP fallback otherwise. */
-  var vt = !!(window.CSS && CSS.supports && CSS.supports('selector(:active-view-transition-type(x))'));
-  var cover = false;
-  if (!reduce) {
-    var act = window.navigation && navigation.activation;
-    if (vt) cover = !!(act && act.from && act.navigationType !== 'reload');
-    else {
-      var nav = performance.getEntriesByType && performance.getEntriesByType('navigation')[0];
-      var ref = ''; try { ref = document.referrer ? new URL(document.referrer).origin : ''; } catch (e) {}
-      cover = !!nav && (nav.type === 'back_forward' || (nav.type === 'navigate' && ref === location.origin));
-    }
-  }
-  window.__motion = { vt: vt, cover: cover, reduce: reduce };
+  window.__motion = { reduce: reduce };
   /* Opaque sheets (the dashboard deck, the tab panel) repeat the page's graph paper; keep their grid in phase with it. */
   window.__alignGrid = function () {
     ['deck', 'tabPanel'].forEach(function (id) {
@@ -90,19 +77,23 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink);
 .deck { position: relative; z-index: 2; background-color: var(--bg); background-image: var(--paper-grid);
   background-size: 60px 60px; background-position: var(--gx, 0) var(--gy, 0); box-shadow: var(--cover-shadow); }
 
-/* Tab changes: the new tab content slides up over the old one. Same in every direction; tab bar stays put. */
-:root { --ease-cover: cubic-bezier(0.32, 0.72, 0, 1); --dur-cover: .35s; }
-@view-transition { navigation: auto; }
-@media (prefers-reduced-motion: reduce) { @view-transition { navigation: none; } }
+/* Tab changes load in place (no page reload) and slide sideways by tab order: a tab to the right comes in
+   from the right and pushes the old content out left; a tab to the left does the reverse. Tab bar stays put. */
+:root { --ease-slide: cubic-bezier(0.32, 0.72, 0, 1); --dur-slide: .35s; }
 .tab-panel { view-transition-name: tab-panel; min-height: 80vh; background-color: var(--bg);
   background-image: var(--paper-grid); background-size: 60px 60px; background-position: var(--gx, 0) var(--gy, 0); }
 ::view-transition-old(root), ::view-transition-new(root) { animation: none; }
 ::view-transition-group(tab-panel) { animation: none; }
-::view-transition-old(tab-panel) { animation: cover-hold var(--dur-cover) linear both; }
-::view-transition-new(tab-panel) { animation: cover-up var(--dur-cover) var(--ease-cover) both; box-shadow: var(--cover-shadow); }
-@keyframes cover-up { from { transform: translateY(75vh); } }
-@keyframes cover-hold { from, to { opacity: 1; } }
-.tab-panel.covering { box-shadow: var(--cover-shadow); position: relative; z-index: 1; }
+::view-transition-old(tab-panel) { animation: slide-out-left var(--dur-slide) var(--ease-slide) both; }
+::view-transition-new(tab-panel) { animation: slide-in-right var(--dur-slide) var(--ease-slide) both; }
+html[data-slide="back"]::view-transition-old(tab-panel) { animation-name: slide-out-right; }
+html[data-slide="back"]::view-transition-new(tab-panel) { animation-name: slide-in-left; }
+@keyframes slide-out-left { to { transform: translateX(-100vw); } }
+@keyframes slide-out-right { to { transform: translateX(100vw); } }
+@keyframes slide-in-right { from { transform: translateX(100vw); } }
+@keyframes slide-in-left { from { transform: translateX(-100vw); } }
+main { position: relative; }
+.tab-panel-ghost { position: absolute; pointer-events: none; z-index: 0; }
 
 /* Focus: blue ring, offset off the ink edge. */
 :focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
@@ -770,58 +761,185 @@ footer :focus-visible { outline-color: var(--fixed-link); }
   });
 })();
 
-/* Ask: open a prefilled GitHub issue (reviewed by the asker before posting). */
-(function () {
-  var form = document.getElementById('askForm');
-  if (!form) return;
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var q = document.getElementById('askText').value.trim();
-    if (!q) return;
-    var url = 'https://github.com/Anandtripathiii/tax_recon/issues/new?title=' +
-      encodeURIComponent('Question: ' + q.slice(0, 70)) + '&body=' + encodeURIComponent(q);
-    window.open(url, '_blank', 'noopener');
-  });
-})();
+/* Ask: open a prefilled GitHub issue (reviewed by the asker before posting). Delegated: the form arrives with the Query tab. */
+document.addEventListener('submit', function (e) {
+  if (!e.target || e.target.id !== 'askForm') return;
+  e.preventDefault();
+  var q = document.getElementById('askText').value.trim();
+  if (!q) return;
+  window.open('https://github.com/Anandtripathiii/tax_recon/issues/new?title=' +
+    encodeURIComponent('Question: ' + q.slice(0, 70)) + '&body=' + encodeURIComponent(q), '_blank', 'noopener');
+});
 
-/* Motion: GSAP + ScrollTrigger. Content appears as-is; the only movement is the deck covering home and tabs covering tabs. */
+/* Tabs load in place and slide by tab order. Content itself never animates in; the only other motion is
+   the dashboard deck sliding up over the pinned home section. */
 (function () {
   var root = document.documentElement;
   var hasGsap = !!(window.gsap && window.ScrollTrigger);
-  var info = window.__motion || {};
-  var reduce = info.reduce;
+  var reduce = (window.__motion || {}).reduce;
   if (!hasGsap || reduce) root.classList.remove('motion');
+  var DUR = .35;
+  var ORDER = ['summary', 'flagged', 'tax', 'anomaly', 'accuracy', 'verify', 'query'];
+  var tabOf = function (u) { return new URL(u, location.href).searchParams.get('tab') || 'summary'; };
+  var align = function () { if (window.__alignGrid) window.__alignGrid(); };
+  var loader = document.getElementById('loader');
+  if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 
-  /* Loader */
-  var loader = document.getElementById('loader'), form = document.getElementById('paramForm');
-  if (form) form.addEventListener('submit', function () { setTimeout(function () { loader.classList.add('on'); }, 150); });
+  /* Run reloads the whole page (every figure changes), so remember where you were and come back to it. */
+  var form = document.getElementById('paramForm');
+  if (form) form.addEventListener('submit', function () {
+    try { sessionStorage.setItem('keepScroll', String(window.scrollY)); } catch (e) {}
+    setTimeout(function () { loader.classList.add('on'); }, 150);
+  });
+  var kept = null; try { kept = sessionStorage.getItem('keepScroll'); sessionStorage.removeItem('keepScroll'); } catch (e) {}
+  if (kept !== null) { var y = +kept; var back = function () { window.scrollTo(0, y); }; back(); window.addEventListener('load', back); }
 
-  /* Example card hide / show */
-  var card = document.getElementById('example'), strip = document.getElementById('restoreStrip');
-  function store(v) { try { v ? localStorage.setItem('hideExample', '1') : localStorage.removeItem('hideExample'); } catch (e) {} }
-  function hidden() { try { return localStorage.getItem('hideExample') === '1'; } catch (e) { return false; } }
-  if (card && strip) {
-    if (hidden()) { card.hidden = true; strip.hidden = false; }
-    document.getElementById('hideExample').addEventListener('click', function () {
-      store(true); card.hidden = true; strip.hidden = false; document.getElementById('showExample').focus();
-    });
-    document.getElementById('showExample').addEventListener('click', function () {
-      store(false); strip.hidden = true; card.hidden = false; document.getElementById('hideExample').focus();
+  /* Example card hide / show (delegated: the card arrives with the Summary tab). */
+  function hiddenPref() { try { return localStorage.getItem('hideExample') === '1'; } catch (e) { return false; } }
+  function applyExample() {
+    var card = document.getElementById('example'), strip = document.getElementById('restoreStrip');
+    if (card && strip) { card.hidden = hiddenPref(); strip.hidden = !hiddenPref(); }
+  }
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('#hideExample, #showExample');
+    if (!t) return;
+    var hide = t.id === 'hideExample';
+    try { hide ? localStorage.setItem('hideExample', '1') : localStorage.removeItem('hideExample'); } catch (er) {}
+    applyExample();
+    var next = document.getElementById(hide ? 'showExample' : 'hideExample'); if (next) next.focus();
+  });
+
+  /* Verification rings fill from empty to their score. The score text is shown as-is from the start. */
+  function fillRings(delay) {
+    if (!hasGsap || reduce) return;
+    Array.prototype.forEach.call(document.querySelectorAll('.ring .fill'), function (el, i) {
+      var c = parseFloat(el.dataset.circ), target = c * (1 - parseFloat(el.dataset.score) / 100);
+      gsap.fromTo(el, { strokeDashoffset: c }, { strokeDashoffset: target, duration: 1.1, ease: 'power3.out', delay: delay + .1 + i * .07 });
     });
   }
 
-  var align = function () { if (window.__alignGrid) window.__alignGrid(); };
+  /* Inline scripts (the Plotly charts) do not run when inserted as HTML; run them by hand. */
+  function runScripts(scope) {
+    Array.prototype.forEach.call(scope.querySelectorAll('script'), function (old) {
+      var s = document.createElement('script'); s.textContent = old.textContent; old.replaceWith(s);
+    });
+  }
+
+  /* ---- In-place tab loading ---- */
+  var panel = document.getElementById('tabPanel');
+  var pending = null;
+
+  function sameApp(u) { return u.origin === location.origin && u.pathname === '/'; }
+
+  function swap(doc) {
+    var fresh = doc.getElementById('tabPanel');
+    panel.innerHTML = fresh.innerHTML;
+    var tabs = document.querySelector('nav.tabs'), freshTabs = doc.querySelector('nav.tabs');
+    if (tabs && freshTabs) tabs.innerHTML = freshTabs.innerHTML;
+    var f = document.getElementById('paramForm'), ff = doc.getElementById('paramForm');
+    if (f && ff) {
+      Array.prototype.forEach.call(f.querySelectorAll('input[type=hidden]'), function (i) { i.remove(); });
+      Array.prototype.forEach.call(ff.querySelectorAll('input[type=hidden]'), function (i) { f.insertBefore(i.cloneNode(), f.firstChild); });
+    }
+    runScripts(panel);
+    applyExample();
+  }
+
+  /* Fallback slide for browsers without View Transitions: a snapshot copy of the old content slides out while the new slides in. */
+  function gsapSlide(dir, update) {
+    var r = panel.getBoundingClientRect(), m = panel.parentNode.getBoundingClientRect();
+    var ghost = panel.cloneNode(true);
+    ghost.removeAttribute('id'); ghost.classList.add('tab-panel-ghost');
+    Array.prototype.forEach.call(ghost.querySelectorAll('[id]'), function (el) { el.removeAttribute('id'); });
+    ghost.style.cssText += ';left:' + (r.left - m.left) + 'px;top:' + (r.top - m.top) + 'px;width:' + r.width + 'px;view-transition-name:none';
+    panel.parentNode.appendChild(ghost);
+    update();
+    var w = window.innerWidth, sign = dir === 'back' ? 1 : -1;
+    gsap.fromTo(ghost, { x: 0 }, { x: sign * w, duration: DUR, ease: 'power3.inOut', onComplete: function () { ghost.remove(); } });
+    gsap.fromTo(panel, { x: -sign * w }, { x: 0, duration: DUR, ease: 'power3.inOut', clearProps: 'transform' });
+  }
+
+  function load(url, opts) {
+    opts = opts || {};
+    var u = new URL(url, location.href);
+    var from = ORDER.indexOf(tabOf(location.href)), to = ORDER.indexOf(tabOf(u.href));
+    var dir = to > from ? 'forward' : to < from ? 'back' : null;
+    if (pending) pending.abort();
+    var ctrl = window.AbortController ? new AbortController() : null; pending = ctrl;
+    var slow = setTimeout(function () { loader.classList.add('on'); }, 300);
+    var keepY = window.scrollY;
+    fetch(u.href, { signal: ctrl && ctrl.signal, headers: { 'X-Requested-With': 'tab' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+      .then(function (html) {
+        clearTimeout(slow); loader.classList.remove('on');
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        if (!doc.getElementById('tabPanel')) throw new Error('no panel');
+        if (opts.push) history.pushState({ tab: tabOf(u.href) }, '', u.pathname + u.search + (u.hash || '#dashboard'));
+        var update = function () { swap(doc); window.scrollTo(0, keepY); align(); };
+        var animate = dir && !reduce;
+        var done = function () {
+          root.removeAttribute('data-slide');
+          if (hasGsap) ScrollTrigger.refresh();
+          window.scrollTo(0, keepY);
+          fillRings(0);
+          if (opts.scrollToDashboard) document.getElementById('dashboard').scrollIntoView({ behavior: reduce ? 'auto' : 'smooth' });
+        };
+        if (animate && document.startViewTransition) {
+          root.setAttribute('data-slide', dir);
+          document.startViewTransition(update).finished.then(done, done);
+        } else if (animate && hasGsap) {
+          gsapSlide(dir, update); setTimeout(done, DUR * 1000);
+        } else { update(); done(); }
+      })
+      .catch(function (err) {
+        clearTimeout(slow); loader.classList.remove('on');
+        if (err && err.name === 'AbortError') return;
+        location.href = u.href; /* if anything goes wrong, fall back to a normal page load */
+      });
+  }
+
+  if (panel && window.fetch && window.DOMParser) {
+    history.replaceState({ tab: tabOf(location.href) }, '');
+    document.addEventListener('click', function (e) {
+      if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+      var a = e.target.closest && e.target.closest('a[href]');
+      if (!a || a.target === '_blank') return;
+      var u = new URL(a.href, location.href);
+      if (!sameApp(u) || !u.search) return;               /* other pages, downloads, plain #anchors */
+      /* Same run = the link's invoices / error rate / seed match what the Run controls show now (the URL may omit them). */
+      var pf = document.getElementById('paramForm'), next = u.searchParams;
+      var sameRun = ['n', 'rate', 'seed'].every(function (k) {
+        var field = pf && pf.elements[k];
+        return !next.has(k) || !field || String(+next.get(k)) === String(+field.defaultValue);
+      });
+      if (!sameRun) return;                                 /* a different run: let it reload */
+      e.preventDefault();
+      if (u.href === location.href && !a.closest('nav.tabs') ) { document.getElementById('dashboard').scrollIntoView({ behavior: 'smooth' }); return; }
+      var inTabs = !!a.closest('nav.tabs') || !!a.closest('#tabPanel');
+      load(u.href, { push: true, scrollToDashboard: !inTabs });
+    });
+    /* The Flagged records filter (search, problem type) also updates in place. */
+    document.addEventListener('submit', function (e) {
+      var f = e.target;
+      if (!f || !f.closest || !f.closest('#tabPanel') || f.id === 'askForm' || (f.method || '').toLowerCase() !== 'get') return;
+      e.preventDefault();
+      var u = new URL(f.getAttribute('action') || '/', location.href);
+      u.search = new URLSearchParams(new FormData(f)).toString();
+      load(u.href, { push: true });
+    });
+    window.addEventListener('popstate', function () { load(location.href, { push: false }); });
+  }
+
   window.addEventListener('resize', align);
   window.addEventListener('load', align);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(align);
+  applyExample();
 
   if (!hasGsap || reduce) return;
   gsap.registerPlugin(ScrollTrigger);
-  var DUR = .35;
-  var home = document.getElementById('home'), deck = document.getElementById('deck'), panel = document.getElementById('tabPanel');
 
-  /* Home stays pinned once its bottom reaches the bottom of the screen; the deck then slides up over it.
-     pinSpacing: false keeps the deck where it is in the page, so it scrolls straight over the pinned home. */
+  /* Home stays pinned once its bottom reaches the bottom of the screen; the deck then slides up over it. */
+  var home = document.getElementById('home'), deck = document.getElementById('deck');
   if (home && deck) {
     ScrollTrigger.create({
       trigger: home, endTrigger: deck,
@@ -829,21 +947,7 @@ footer :focus-visible { outline-color: var(--fixed-link); }
       end: 'top top', pin: true, pinSpacing: false, invalidateOnRefresh: true
     });
   }
-
-  /* Fallback cover for browsers without cross-document View Transitions: the new tab content slides up into place. */
-  if (!info.vt && info.cover && panel) {
-    panel.classList.add('covering');
-    gsap.from(panel, { y: Math.round(window.innerHeight * 0.75), duration: DUR, ease: 'power3.out', clearProps: 'transform',
-      onComplete: function () { panel.classList.remove('covering'); } });
-  }
-
-  /* Verification rings fill from empty to their score. The score text is shown as-is from the start. */
-  Array.prototype.forEach.call(document.querySelectorAll('.ring .fill'), function (el, i) {
-    var c = parseFloat(el.dataset.circ), target = c * (1 - parseFloat(el.dataset.score) / 100);
-    gsap.fromTo(el, { strokeDashoffset: c }, { strokeDashoffset: target, duration: 1.1, ease: 'power3.out',
-      delay: (info.cover ? DUR : 0) + .1 + i * .07 });
-  });
-
+  fillRings(0);
   var refresh = function () { align(); ScrollTrigger.refresh(); };
   window.addEventListener('load', refresh);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(refresh);
