@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-10T20:19:40+00:00",
+  "generatedAt": "2026-10-10T20:29:07+00:00",
   "title": "Design System: Tax Reconciliation",
   "extensions": {
     "colorMeta": {
@@ -490,7 +490,7 @@
       },
       {
         "name": "The Cover Rule",
-        "body": "The page is three stacked sheets, each opaque graph paper with a hard 6px ink edge on top and soft depth behind. (1) Home is the hero alone, exactly one screen tall (100svh), locked for the first 400px of scroll (four wheel ticks). (2) The Live Proof sheet (\"What we do\" and \"Live proof\") slides up over it, then locks once it is fully on screen. (3) The Ledger app screen slides up over that. Built with GSAP ScrollTrigger: pins with pinSpacing off, and the Live Proof sheet pushed down by the 400px hold.",
+        "body": "The page is three stacked sheets, each opaque graph paper with a hard 6px ink edge on top and soft depth behind. (1) Home is the hero alone, exactly one screen tall (100svh), locked for the first 400px of scroll (four wheel ticks). (2) The Live Proof sheet (\"What we do\" and \"Live proof\") slides up over it, then locks once it is fully on screen. (3) The Ledger app screen slides up over that. Built with plain CSS position: sticky (home at top: 0; Live Proof at top: 0, or at its bottom edge when taller than the screen), with a 400px top margin on the Live Proof sheet as the hold. No scroll-driven JavaScript, so a sheet's content can never drop out while another covers it, in either direction.",
         "section": "elevation"
       },
       {
