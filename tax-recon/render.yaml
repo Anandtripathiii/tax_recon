@@ -5,3 +5,10 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     plan: free
+    envVars:
+      # One session secret that survives deploys (the free plan wipes the disk, which would log everyone out).
+      - key: FLASK_SECRET_KEY
+        generateValue: true
+      # Set this one yourself in the Render dashboard to turn on the AI in Ask the Ledger. Never commit it.
+      - key: ANTHROPIC_API_KEY
+        sync: false
